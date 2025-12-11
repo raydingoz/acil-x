@@ -3,38 +3,42 @@
   "cases": [
     {
       "id": "case-001",
-      "title": "Göğüs Ağrısı",
+      "title": "Akut İnme Şüphesi",
       "difficulty": "orta",
       "tags": [
-        "kardiyoloji",
-        "STEMI"
+        "nöroloji",
+        "acil"
       ],
       "patient": {
-        "age": 55,
-        "sex": "E",
-        "setting": "ambulans",
+        "age": 68,
+        "sex": "K",
+        "setting": "acil",
         "triage": "kırmızı"
       },
-      "paramedic": "112 ekibi tarafından evde senkop sonrası göğüs ağrısı ile alınan hasta. İlk değerlendirmede hipotansif ve taşikardik.",
-      "story": "55 yaşında erkek hasta, 1 saattir devam eden, göğüs ortasında baskı tarzında ağrı tarifliyor. Ağrı sol kola ve çeneye yayılıyor. Soğuk terleme mevcut.",
+      "paramedic": "68 yaş kadın hasta, ani konuşma bozukluğu ve sağ hemiparezi ile 20 dakika önce görüldü. Kan şekeri normal, hava yolu güvenli, oksijen veriliyor.",
+      "story": "Hasta 30 dakikadır devam eden konuşma güçlüğü, sağ kolda güçsüzlük ve yüzde asimetri şikayetiyle başvurdu. Antikoagülan kullanımı yok, son bilinen normal zamanı 30 dakika önce.",
       "exam": {
-        "vitals": "TA: 90/60 mmHg, Nabız: 110/dk, SpO2: %92 (oda havası), Solunum sayısı: 24/dk",
-        "physical": "Bilinç açık, oryante ve koopere. Solunum sesleri bilateral veziküler, ral/rhonşi yok. Kalp sesleri taşikardik, ek ses yok. Periferik nabızlar zayıf."
+        "vitals": "TA: 180/100 mmHg, Nabız: 92/dk, SpO2: %96 (oda havası), Solunum: 18/dk, Glisemi: 108 mg/dl",
+        "physical": "Bilinç açık, afazik. Sağda 2/5 motor güç, pupil izokorik, meningeal bulgu yok. NIHSS: 9."
       },
       "labs": {
-        "troponin": "Yüksek (örn. 3x üst sınır)",
-        "d_dimer": "Normal",
-        "ck_mb": "Yüksek",
+        "tam_kan": "Hb 12.5 g/dL, WBC 9.8k, PLT 240k",
+        "elektrolit_paneli": "Na 139 mEq/L, K 4.1 mEq/L, Kreatinin 0.9 mg/dL",
+        "pt_inr": "PT/INR: 1.0",
+        "troponin_i": "Troponin I normal",
         "default": "Bu tetkik için sonuç yok."
       },
       "imaging": {
-        "ekg": "II, III ve aVF derivasyonlarında ST elevasyonu, karşılık gelen prekordiyal derivasyonlarda ST depresyonu.",
-        "xray": "Akciğer grafisi normal sınırlarda, kardiyotorasik indeks normal.",
+        "beyin_bt": "Akut kanama saptanmadı, orta hat kayması yok, erken iskemik bulgu yok.",
+        "beyin_mr": "DWI: sol MCA bölgesinde kısıtlı difüzyon, MRA'da distal M2 segmentinde daralma.",
+        "toraks_bt": "Pulmoner emboli lehine bulgu yok, akciğer alanları temiz.",
+        "ekg": "Sinüs ritmi, ST elevasyonu yok.",
         "default": "Bu görüntüleme için kayıt yok."
       },
       "procedures": {
-        "cpr": "Ritim VF olduğunda yüksek enerjili (ör. 200 J) defibrilasyon önerilir.",
-        "defibrillation": "Monofazik/bifazik cihazlara göre uygun enerji ile tek şok ardından kompresyona devam edilmesi gerekir.",
+        "oksijen_nazal_kanul": "2 L/dk oksijen ile SpO2 %98'e çıkar, solunum rahatlar.",
+        "iv_erisim": "18G damar yolu açıldı, sıvı desteği için hazır.",
+        "kan_basinci_kontrolu": "Labetalol bolus sonrası TA 150/90 mmHg'ye düşer, nörolojik tablo değişmez.",
         "default": "Prosedür sonucu kaydı yok."
       },
       "media": {
@@ -47,25 +51,27 @@
       },
       "drugs": [
         {
-          "name": "Aspirin",
+          "name": "Asetilsalisilik asit",
           "doses": [
             "300 mg çiğneme"
           ],
-          "response": "Ağrı bir miktar azalır, trombosit agregasyonu baskılanır."
+          "response": "Antiplatelet başlandı, semptom stabil seyretti."
         },
         {
-          "name": "Nitrogliserin",
+          "name": "Labetalol",
           "doses": [
-            "0.4 mg dil altı"
+            "10 mg IV bolus",
+            "Tekrar 10 mg bolus"
           ],
-          "response": "Kan basıncı yeterliyse ağrıda azalma olabilir; hipotansiyonda dikkatli kullanılmalıdır."
+          "response": "Kan basıncı kontrollü şekilde düşer, nörolojik durum stabil kalır."
         }
       ],
       "consults": [
-        "Kardiyoloji"
+        "Nöroloji",
+        "Radyoloji"
       ],
-      "disposition": "Primer PCI yapılabilen merkeze acil nakil planlanmalı.",
-      "final_diagnosis": "STEMI",
+      "disposition": "İnme ünitesinde yatırılarak tromboliz için değerlendirme yapılmalı.",
+      "final_diagnosis": "Akut iskemik inme",
       "scoring": {
         "base": 100,
         "penalty_per_lab": 5,
@@ -76,7 +82,7 @@
     },
     {
       "id": "case-002",
-      "title": "Travma Sonrası Hipotansiyon",
+      "title": "Toraks Travması ve Hipotansiyon",
       "difficulty": "zor",
       "tags": [
         "travma",
@@ -88,25 +94,28 @@
         "setting": "acil",
         "triage": "kırmızı"
       },
-      "paramedic": "Yüksekten düşme sonrası 20 dakikada olay yerine ulaşılmış, servikal immobilizasyon yapılmış, acile getirilmiş.",
-      "story": "32 yaşında erkek hasta, 3. kattan düşme sonrası acil servise getiriliyor. Bilinç bulanık, karında dolgunluk hissi mevcut.",
+      "paramedic": "3. kattan düşme sonrası servikal immobilizasyon ile acile getirildi. Olay yerine ulaşım 20 dakika sürdü, olay yerinde hipotansifti.",
+      "story": "32 yaş erkek hasta, yüksekten düşme sonrası göğüs ağrısı ve nefes darlığı ile acile getiriliyor. Karında dolgunluk hissi ve sağ hemitoraksta solunum seslerinde azalma var.",
       "exam": {
-        "vitals": "TA: 80/50 mmHg, Nabız: 130/dk, SpO2: %94 (oksijen desteği ile), Solunum: 28/dk",
-        "physical": "Bilinç konfü, periton irritasyon bulguları, karında hassasiyet ve defans. Pelvis stabil değil."
+        "vitals": "TA: 80/50 mmHg, Nabız: 130/dk, SpO2: %92 (oksijen ile), Solunum: 30/dk",
+        "physical": "Bilinç konfü, sağ hemitoraksta solunum sesleri az, juguler venöz distansiyon yok. Karında hassasiyet ve defans mevcut. Pelvis stabil değil."
       },
       "labs": {
-        "hb": "Düşük (ör. 7 g/dL)",
-        "hct": "Düşük",
+        "tam_kan": "Hb 7.2 g/dL, Hct %22, WBC 14k",
+        "laktat": "Laktat 4.5 mmol/L",
+        "kan_gazi": "pH 7.28, HCO3 16, BE -8",
         "default": "Bu tetkik için sonuç yok."
       },
       "imaging": {
+        "toraks_bt": "Sağda çoklu kot kırığı, sağ hemotoraks; minimal pnömotoraks alanı.",
+        "batin_bt": "Dalakta Grade III laserasyon, serbest sıvı artışı.",
         "fast": "Abdominal FAST pozitif, Morrison ve splenorenal aralıkta serbest sıvı.",
-        "pelvic_xray": "Pelvis kırığı ile uyumlu görünüm.",
         "default": "Bu görüntüleme için kayıt yok."
       },
       "procedures": {
-        "blood_transfusion": "Masif transfüzyon protokolü başlatılır.",
-        "pelvic_binder": "Pelvik binder ile stabilizasyon yapılır, hemodinami bir miktar düzelebilir.",
+        "toraks_tupu": "Sağ tüp torakostomi sonrası oksijen satürasyonu %97'ye çıkar, tansiyon kısmen toparlar.",
+        "pelvik_binder": "Pelvik binder ile stabilizasyon sonrası kan basıncı hafif yükselir.",
+        "massif_transfuzyon": "Masif transfüzyon protokolü başlatıldı, hemodinami toparlıyor.",
         "default": "Prosedür sonucu kaydı yok."
       },
       "media": {
@@ -124,14 +133,22 @@
             "500 mL hızlı infüzyon",
             "1000 mL hızlı infüzyon"
           ],
-          "response": "Kan basıncında kısmi düzelme olabilir ancak kontrolsüz kanamada dikkatli olunmalı."
+          "response": "Kan basıncında kısmi düzelme olabilir, kanama kontrolü öncelikli olmalı."
+        },
+        {
+          "name": "Traneksamik asit",
+          "doses": [
+            "1 g IV bolus",
+            "1 g IV infüzyon/8 saat"
+          ],
+          "response": "Kanama kontrolüne katkı sağlar, hipotansiyon kısmen toparlar."
         }
       ],
       "consults": [
         "Genel Cerrahi",
-        "Ortopedi"
+        "Göğüs Cerrahisi"
       ],
-      "disposition": "Acil cerrahi girişim ve yoğun bakım ihtiyacı.",
+      "disposition": "Acil cerrahi girişim ve yoğun bakım ihtiyacı var, masif transfüzyon protokolü sürdürülmeli.",
       "final_diagnosis": "Hemorajik şok",
       "scoring": {
         "base": 120,

@@ -34,6 +34,7 @@ let flowDefaults = null;
 let flowHistory = [];
 let timerInterval = null;
 let simulatedMinutes = 0;
+let activeFlowStep = 'anamnez';
 const selectionState = {
   anamnezMuayene: [],
   istekler: [],
@@ -302,6 +303,8 @@ function initActions() {
   $('#doProcedureBtn').addEventListener('click', () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox')));
 
   $('#showResultsBtn').addEventListener('click', handleShowResults);
+  $('#quickApplyBtn')?.addEventListener('click', handleQuickApply);
+  $('#openDiagnosisBtn')?.addEventListener('click', openDiagnosisModal);
 
   $('#giveDrugBtn').addEventListener('click', handleDrugAction);
 
@@ -345,6 +348,14 @@ function initFlowControls() {
   $all('[data-step-submit]').forEach(btn => {
     btn.addEventListener('click', () => handleFlowSubmit(btn.dataset.stepSubmit));
   });
+  ['anamnez', 'muayene', 'tetkik', 'tani'].forEach(step => {
+    const sel = $(`#${step}Select`);
+    if (sel) {
+      sel.addEventListener('change', () => setActiveFlowStep(step));
+      sel.addEventListener('focus', () => setActiveFlowStep(step));
+    }
+  });
+  setActiveFlowStep(activeFlowStep);
 }
 
 function renderFlowOptions() {
@@ -397,6 +408,8 @@ async function handleFlowSubmit(step) {
   if (!select) return;
   const choice = select.value;
   if (!choice) return;
+
+  setActiveFlowStep(step);
 
   const entry = {
     id: uuid(),
@@ -460,6 +473,24 @@ function updateFlowPlaceholder(step, choice) {
   if (report) {
     report.textContent = placeholder?.report || 'Seçim raporu hazır olduğunda burada gösterilecek.';
   }
+}
+
+function setActiveFlowStep(step) {
+  activeFlowStep = step;
+  const label = $('#activeStepLabel');
+  if (!label) return;
+  const titles = {
+    anamnez: 'Anamnez',
+    muayene: 'Muayene',
+    tetkik: 'Tetkik',
+    tani: 'Tanı/Tedavi'
+  };
+  label.textContent = `Aktif adım: ${titles[step] || step}`;
+}
+
+function handleQuickApply() {
+  if (!activeFlowStep) return;
+  handleFlowSubmit(activeFlowStep);
 }
 
 async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
@@ -896,6 +927,7 @@ function resetRequestQueue() {
   simulatedMinutes = 0;
   renderRequestQueue();
   updateCaseStatusLocal('stabil');
+  updateVirtualTimeDisplay();
 }
 
 function formatTimestamp(value) {
@@ -1017,6 +1049,13 @@ function renderRequestQueue() {
     });
 }
 
+function updateVirtualTimeDisplay() {
+  const label = $('#virtualTime');
+  if (label) {
+    label.textContent = `${simulatedMinutes} dk`;
+  }
+}
+
 function showExamAlert(choice) {
   const message = `Muayene seçimin kaydedildi: ${choice}`;
   alert(message);
@@ -1029,7 +1068,64 @@ function showRequestModal(section, key, resultText) {
   if (!overlay || !body) return;
   $('#studentModalTitle').textContent = title;
   body.innerHTML = `<p><strong>${key}</strong> için yanıt:</p><p>${resultText}</p>`;
+  setModalActions();
   openStudentModal();
+}
+
+function openDiagnosisModal() {
+  const overlay = $('#studentModalOverlay');
+  const body = $('#studentModalBody');
+  if (!overlay || !body) return;
+  const expectedDx = currentCase?.final_diagnosis || 'Final tanı';
+  $('#studentModalTitle').textContent = 'Tanı ve Planı Tamamla';
+  const options = [
+    `Tanı: ${expectedDx}`,
+    'Yoğun bakıma yatır',
+    'Servise yatır',
+    'Acil ameliyat planla',
+    'Taburcu & poliklinik kontrol'
+  ];
+  body.innerHTML = `<p>Hızlı tanı ve plan seç. Seçim vaka için kaydedilir.</p>
+    <form id="diagnosisQuickForm" class="option-list">${options
+      .map((opt, idx) => `<label><input type="radio" name="diagnosisOption" value="${opt}" ${idx === 0 ? 'checked' : ''}/> ${opt}</label>`)
+      .join('')}</form>`;
+  setModalActions([
+    { text: 'Kaydet', className: 'btn primary', attrs: { id: 'confirmDiagnosisBtn' } },
+    { text: 'Vazgeç', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } }
+  ]);
+  openStudentModal();
+  $('#confirmDiagnosisBtn')?.addEventListener('click', () => {
+    const form = $('#diagnosisQuickForm');
+    if (!form) return;
+    const data = new FormData(form);
+    const choice = data.get('diagnosisOption');
+    finalizeDiagnosisSelection(choice);
+    closeStudentModal();
+  });
+}
+
+function finalizeDiagnosisSelection(choice) {
+  if (!choice) return;
+  const diagnosisInput = $('#diagnosisInput');
+  const diagnosisBox = $('#diagnosisResultBox');
+  if (diagnosisInput) diagnosisInput.value = choice;
+  if (diagnosisBox) diagnosisBox.textContent = `Tanı/plan: ${choice}`;
+  appendLog({
+    section: 'diagnosis',
+    actionType: 'diagnosis',
+    key: choice,
+    result: 'Tanı/plan kaydedildi.',
+    scoreDelta: 0
+  });
+  const expectedDx = currentCase?.final_diagnosis || '';
+  const normalizedChoice = choice.toLowerCase();
+  const isAligned = expectedDx && normalizedChoice.includes(expectedDx.toLowerCase());
+  const summaryLines = [
+    `Seçim: ${choice}`,
+    `Beklenen tanı ile uyum: ${isAligned ? 'Evet' : 'Hayır'}`,
+    `Kaydedilen adım: ${flowHistory.length} seçim`
+  ];
+  alert(summaryLines.join('\n'));
 }
 
 function handleShowResults() {
@@ -1038,6 +1134,7 @@ function handleShowResults() {
   requestQueue.forEach(item => {
     item.waitedMinutes += increment;
   });
+  updateVirtualTimeDisplay();
   renderRequestQueue();
 
   const scenarioResult = evaluateScenarioRules();
@@ -1086,9 +1183,7 @@ function initStudentModal() {
   overlay.addEventListener('click', evt => {
     if (evt.target === overlay) closeStudentModal();
   });
-  overlay.querySelectorAll('[data-close-student-modal]').forEach(btn => {
-    btn.addEventListener('click', closeStudentModal);
-  });
+  attachModalCloseHandlers();
 }
 
 function openStudentModal() {
@@ -1103,6 +1198,33 @@ function closeStudentModal() {
   if (!overlay) return;
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
+}
+
+function setModalActions(configs = []) {
+  const actionsEl = $('.modal-actions');
+  if (!actionsEl) return;
+  const buttons = configs.length
+    ? configs
+    : [{ text: 'Tamam', className: 'btn', attrs: { 'data-close-student-modal': '' } }];
+
+  actionsEl.innerHTML = '';
+  buttons.forEach(cfg => {
+    const btn = createEl('button', {
+      text: cfg.text || 'Kapat',
+      className: cfg.className || 'btn',
+      attrs: { type: 'button', ...(cfg.attrs || {}) }
+    });
+    actionsEl.appendChild(btn);
+  });
+  attachModalCloseHandlers();
+}
+
+function attachModalCloseHandlers() {
+  const overlay = $('#studentModalOverlay');
+  if (!overlay) return;
+  overlay.querySelectorAll('[data-close-student-modal]').forEach(btn => {
+    btn.addEventListener('click', closeStudentModal);
+  });
 }
 
 function formatSection(section) {
