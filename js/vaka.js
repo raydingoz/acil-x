@@ -44,6 +44,11 @@ const requestQueue = [];
 const searchFilters = [];
 const animatedResultIds = new Set();
 
+const setTextContent = (selector, text) => {
+  const el = $(selector);
+  if (el) el.textContent = text;
+};
+
 const WAIT_TIME_BY_SECTION = {
   labs: 20,
   imaging: 30,
@@ -200,9 +205,12 @@ function loadCaseById(caseId) {
 
   // Muayene
   const vitalsText = currentCase.exam?.vitals || 'Vital bulgular tanımlı değil.';
-  $('#examVitals')?.textContent = vitalsText;
-  $('#monitorVitals')?.textContent = vitalsText;
-  $('#examPhysical')?.textContent = currentCase.exam?.physical || 'Fizik muayene bulguları tanımlı değil.';
+  setTextContent('#examVitals', vitalsText);
+  setTextContent('#monitorVitals', vitalsText);
+  setTextContent(
+    '#examPhysical',
+    currentCase.exam?.physical || 'Fizik muayene bulguları tanımlı değil.'
+  );
 
   // Dropdownlar
   setupKeyedSelect($('#labSelect'), currentCase.labs);
@@ -429,19 +437,21 @@ function initActions() {
     scoreManager.reset();
     updateScoreUI();
     clearLog();
-    $('#labResultBox')?.textContent = '';
-    $('#imagingResultBox')?.textContent = '';
-    $('#procedureResultBox')?.textContent = '';
-    $('#drugResultBox')?.textContent = '';
+    setTextContent('#labResultBox', '');
+    setTextContent('#imagingResultBox', '');
+    setTextContent('#procedureResultBox', '');
+    setTextContent('#drugResultBox', '');
     const dispositionResult = $('#dispositionResultBox');
     if (dispositionResult) dispositionResult.textContent = currentCase.disposition || '';
     const diagnosisInput = $('#diagnosisInput');
     if (diagnosisInput) diagnosisInput.value = '';
-    $('#diagnosisResultBox')?.textContent = '';
+    setTextContent('#diagnosisResultBox', '');
     resetSelectionState();
     resetRequestQueue();
-    syncScoreToSession();
   });
+
+  syncScoreToSession();
+});
 }
 
 function initFlowControls() {
