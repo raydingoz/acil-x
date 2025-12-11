@@ -6,3 +6,4 @@ Acil Servis Simulasyonu
 - JSON şeması ve Firestore eşlemesi: [docs/case-schema.md](docs/case-schema.md)
 - Örnek veri: [data/cases.json](data/cases.json)
 - Şablon: [data/sample_case_template.json](data/sample_case_template.json)
+- Firebase yapılandırması: [docs/firebase-setup.md](docs/firebase-setup.md)
