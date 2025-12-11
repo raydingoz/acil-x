@@ -1,9 +1,12 @@
 import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {
+  addDoc,
   collection,
   doc,
   getFirestore,
   onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc
@@ -102,5 +105,28 @@ export function listenToParticipantScores(sessionId, callback) {
     const scores = [];
     snap.forEach(docSnap => scores.push({ id: docSnap.id, ...docSnap.data() }));
     callback(scores);
+  });
+}
+
+export async function pushSelection(sessionId, payload) {
+  const db = requireFirestore();
+  if (!db || !sessionId) return false;
+  const selectionsRef = collection(doc(db, 'sessions', sessionId), 'selections');
+  await addDoc(selectionsRef, {
+    ...payload,
+    createdAt: serverTimestamp()
+  });
+  return true;
+}
+
+export function listenToSelections(sessionId, callback) {
+  const db = requireFirestore();
+  if (!db || !sessionId) return () => {};
+  const selectionsRef = collection(doc(db, 'sessions', sessionId), 'selections');
+  const q = query(selectionsRef, orderBy('createdAt', 'desc'));
+  return onSnapshot(q, snap => {
+    const selections = [];
+    snap.forEach(docSnap => selections.push({ id: docSnap.id, ...docSnap.data() }));
+    callback(selections);
   });
 }

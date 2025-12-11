@@ -1,5 +1,13 @@
-import { $, $all, createEl, formatTime } from './ui.js';
-import { loadCasesData, getFeaturedCaseId, findCaseById, loadOrCreateUser, updateUserName, queryLLM } from './data.js';
+import { $, $all, createEl, formatTime, uuid } from './ui.js';
+import {
+  loadCasesData,
+  getFeaturedCaseId,
+  findCaseById,
+  loadOrCreateUser,
+  updateUserName,
+  queryLLM,
+  loadFlowDefaults
+} from './data.js';
 import { ScoreManager } from './scoring.js';
 import { STORAGE_KEYS } from './config.js';
 import {
@@ -7,8 +15,10 @@ import {
   initFirestore,
   listenToParticipantScores,
   listenToSession,
+  listenToSelections,
   updateParticipantScore,
-  updateSessionState
+  updateSessionState,
+  pushSelection
 } from './firestoreService.js';
 
 let casesData = null;
@@ -19,6 +29,12 @@ let sessionId = null;
 let sessionUnsubscribe = null;
 let scoresUnsubscribe = null;
 let hostState = null;
+let selectionUnsubscribe = null;
+let flowDefaults = null;
+let flowHistory = [];
+let timerInterval = null;
+
+const FLOW_TIMER_DURATION_MS = 12 * 60 * 1000; // 12 dakikalık varsayılan süre
 
 window.llmEnabled = false;
 
@@ -27,6 +43,8 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   user = loadOrCreateUser();
   initUserUI();
+
+  flowDefaults = await loadFlowDefaults();
 
   casesData = await loadCasesData();
   populateCaseSelect(casesData);
@@ -38,6 +56,7 @@ async function init() {
   initTabs();
   initActions();
   initHostPanel();
+  initFlowControls();
 }
 
 function initUserUI() {
@@ -126,6 +145,9 @@ function loadCaseById(caseId) {
   // Final tanı
   $('#diagnosisInput').value = '';
   $('#diagnosisResultBox').textContent = '';
+
+  renderFlowOptions();
+  updateFlowPlaceholder(null, null);
 
   // Skor
   scoreManager = new ScoreManager(user.id, currentCase.id, currentCase.scoring);
@@ -254,6 +276,120 @@ function initActions() {
     $('#diagnosisResultBox').textContent = '';
     syncScoreToSession();
   });
+}
+
+function initFlowControls() {
+  $all('[data-step-submit]').forEach(btn => {
+    btn.addEventListener('click', () => handleFlowSubmit(btn.dataset.stepSubmit));
+  });
+}
+
+function renderFlowOptions() {
+  const config = flowDefaults || {};
+  const steps = ['anamnez', 'muayene', 'tetkik', 'tani'];
+  steps.forEach(step => {
+    const select = $(`#${step}Select`);
+    const hint = $(`#${step}Hint`);
+    if (!select) return;
+    select.innerHTML = '';
+    const defaults = config.flowOptions?.[step] || [];
+    const caseSpecific = collectCaseSpecificOptions(step);
+    const items = [...new Set([...defaults, ...caseSpecific])];
+    if (!items.length) {
+      const opt = createEl('option', { text: 'Seçenek bulunamadı', attrs: { value: '' } });
+      select.appendChild(opt);
+      select.disabled = true;
+    } else {
+      items.forEach(item => {
+        const opt = createEl('option', { text: item, attrs: { value: item } });
+        select.appendChild(opt);
+      });
+      select.disabled = false;
+    }
+    if (hint) {
+      const report = config.flowPlaceholders?.[step]?.report || '';
+      hint.textContent = report;
+    }
+  });
+}
+
+function collectCaseSpecificOptions(step) {
+  if (!currentCase) return [];
+  if (step === 'anamnez') return [currentCase.story || 'Anamnez kaydı'];
+  if (step === 'muayene') return [currentCase.exam?.vitals, currentCase.exam?.physical].filter(Boolean);
+  if (step === 'tetkik') {
+    const labs = Object.keys(currentCase.labs || {}).filter(k => k !== 'default');
+    const imaging = Object.keys(currentCase.imaging || {}).filter(k => k !== 'default');
+    return [...labs, ...imaging];
+  }
+  if (step === 'tani') {
+    const drugs = (currentCase.drugs || []).map(d => d.name).filter(Boolean);
+    return [currentCase.final_diagnosis, ...drugs].filter(Boolean);
+  }
+  return [];
+}
+
+async function handleFlowSubmit(step) {
+  const select = $(`#${step}Select`);
+  if (!select) return;
+  const choice = select.value;
+  if (!choice) return;
+
+  const entry = {
+    id: uuid(),
+    step,
+    choice,
+    caseId: currentCase?.id || null,
+    userId: user?.id || null,
+    userName: user?.name || 'Kullanıcı',
+    createdAt: Date.now()
+  };
+
+  flowHistory = [entry, ...flowHistory].slice(0, 50);
+  renderFlowHistory();
+  updateFlowPlaceholder(step, choice);
+
+  if (sessionId) {
+    await pushSelection(sessionId, entry);
+  }
+}
+
+function renderFlowHistory() {
+  const list = $('#selectionHistory');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!flowHistory.length) {
+    const empty = createEl('li', { text: 'Henüz seçim yapılmadı.' });
+    list.appendChild(empty);
+    return;
+  }
+  flowHistory.slice(0, 20).forEach(item => {
+    const time = item.createdAt?.toDate ? item.createdAt.toDate() : item.createdAt;
+    const timeText = formatTime(time || new Date());
+    const li = createEl('li', {
+      html: `<strong>${item.step}</strong> — ${item.choice} <span class="muted">${timeText}</span><br/><small>${item.userName || 'Katılımcı'}</small>`
+    });
+    list.appendChild(li);
+  });
+}
+
+function updateFlowPlaceholder(step, choice) {
+  const img = $('#flowPlaceholderImage');
+  const text = $('#flowPlaceholderText');
+  const report = $('#flowReportText');
+  const placeholder = step ? flowDefaults?.flowPlaceholders?.[step] : null;
+
+  if (img) {
+    const source = placeholder?.image || flowDefaults?.flowPlaceholders?.anamnez?.image;
+    img.src = source || '';
+    img.alt = step ? `${step} placeholder` : 'Akış görseli';
+  }
+  if (text) {
+    text.textContent = choice || 'Adımlardan birini seçerek ilerleyin.';
+  }
+  if (report) {
+    report.textContent = placeholder?.report || 'Seçim raporu hazır olduğunda burada gösterilecek.';
+  }
 }
 
 async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
@@ -449,6 +585,11 @@ async function connectToSession(targetSessionId) {
   if (scoresUnsubscribe) scoresUnsubscribe();
   scoresUnsubscribe = listenToParticipantScores(sessionId, renderParticipantScores);
 
+  if (selectionUnsubscribe) selectionUnsubscribe();
+  selectionUnsubscribe = listenToSelections(sessionId, syncSelectionHistory);
+
+  startTimerTicker();
+
   updateSessionStatus('Firestore oturumuna bağlanıldı.');
   syncScoreToSession();
 }
@@ -463,6 +604,7 @@ function updateHostStatus(snapshot) {
   if (snapshot.activeCaseId) parts.push(`Aktif vaka: ${snapshot.activeCaseId}`);
   if (snapshot.timerRunning) parts.push('Süre çalışıyor');
   updateSessionStatus(parts.join(' | '));
+  updateRemainingTime();
 }
 
 function renderParticipantScores(scores) {
@@ -528,4 +670,38 @@ function findNextCase() {
   const idx = casesData.cases.findIndex(c => c.id === currentCase.id);
   const nextIdx = idx >= 0 && idx < casesData.cases.length - 1 ? idx + 1 : 0;
   return casesData.cases[nextIdx];
+}
+
+function syncSelectionHistory(items) {
+  flowHistory = (items || []).map(item => ({
+    ...item,
+    createdAt: item.createdAt || Date.now()
+  }));
+  renderFlowHistory();
+  if (flowHistory[0]) {
+    updateFlowPlaceholder(flowHistory[0].step, flowHistory[0].choice);
+  }
+}
+
+function startTimerTicker() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateRemainingTime, 1000);
+  updateRemainingTime();
+}
+
+function updateRemainingTime() {
+  const el = $('#remainingTime');
+  if (!el) return;
+  if (!hostState?.timerRunning || !hostState?.timerStartedAt) {
+    el.textContent = '--:--';
+    return;
+  }
+  const started = hostState.timerStartedAt;
+  const stopped = hostState.timerStoppedAt;
+  const now = Date.now();
+  const elapsed = Math.max((stopped || now) - started, 0);
+  const remaining = Math.max(FLOW_TIMER_DURATION_MS - elapsed, 0);
+  const minutes = String(Math.floor(remaining / 60000)).padStart(2, '0');
+  const seconds = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
+  el.textContent = `${minutes}:${seconds}`;
 }

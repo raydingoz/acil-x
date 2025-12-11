@@ -1,0 +1,42 @@
+{
+  "flowPlaceholders": {
+    "anamnez": {
+      "image": "assets/placeholders/anamnez.svg",
+      "report": "Anamnez detayları henüz seçilmedi."
+    },
+    "muayene": {
+      "image": "assets/placeholders/muayene.svg",
+      "report": "Muayene bulguları bekleniyor."
+    },
+    "tetkik": {
+      "image": "assets/placeholders/tetkik.svg",
+      "report": "Tetkik sonuçları henüz gelmedi."
+    },
+    "tani": {
+      "image": "assets/placeholders/tani.svg",
+      "report": "Tanı veya tedavi kararı girilmedi."
+    }
+  },
+  "flowOptions": {
+    "anamnez": [
+      "Şikayetleri ayrıntılandır",
+      "Risk faktörlerini sorgula",
+      "İlaç ve alerji bilgisi al"
+    ],
+    "muayene": [
+      "Vital bulguları kontrol et",
+      "Kardiyak ve solunum muayenesi yap",
+      "Nörolojik değerlendirme"
+    ],
+    "tetkik": [
+      "EKG çek",
+      "Kan tetkikleri iste",
+      "Görüntüleme planla"
+    ],
+    "tani": [
+      "Ön tanı oluştur",
+      "Tedavi başla",
+      "Konsültasyon iste"
+    ]
+  }
+}
