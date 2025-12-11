@@ -31,24 +31,6 @@
   </header>
 
   <main class="mobile-body stage-layout" aria-label="Vaka akışı">
-    <section class="mobile-card compact profile-card" aria-label="Profil özeti">
-      <div class="row-inline">
-        <div>
-          <p class="eyebrow mini">Rumuz</p>
-          <strong id="userNameDisplay">-</strong>
-        </div>
-        <div class="stat-chip">
-          <span class="chip-label">LLM</span>
-          <label class="inline-toggle small">
-            <input type="checkbox" id="llmToggle" />
-            Açık
-          </label>
-        </div>
-        <button id="resetCaseBtn" class="btn danger tiny">Sıfırla</button>
-      </div>
-      <p class="muted mini">En iyi skor: <span id="bestScore">-</span></p>
-    </section>
-
     <section class="stage-grid" aria-label="Hasta sahnesi">
       <div class="action-rail rail-left" aria-label="Sol eylemler">
         <button class="rail-btn" data-quick-action="anamnez">Anamnez</button>
@@ -150,53 +132,6 @@
       </div>
     </section>
 
-    <section class="mobile-card" aria-label="İstekler ve sonuçlar">
-      <div class="row-inline wrap">
-        <div class="field collapsible" data-collapsible>
-          <button class="collapsible-trigger" type="button" aria-expanded="false" aria-controls="labBlock">Laboratuvar</button>
-          <div id="labBlock" class="collapsible-body">
-            <input type="search" class="option-search" data-search-target="labSelect" placeholder="Laboratuvar ara" />
-            <select id="labSelect"></select>
-            <button id="requestLabBtn" class="btn tiny">İste</button>
-            <div class="result-box" id="labResultBox"></div>
-          </div>
-        </div>
-        <div class="field collapsible" data-collapsible>
-          <button class="collapsible-trigger" type="button" aria-expanded="false" aria-controls="imagingBlock">Görüntüleme</button>
-          <div id="imagingBlock" class="collapsible-body">
-            <input type="search" class="option-search" data-search-target="imagingSelect" placeholder="Görüntüleme ara" />
-            <select id="imagingSelect"></select>
-            <button id="requestImagingBtn" class="btn tiny">İste</button>
-            <div class="result-box" id="imagingResultBox"></div>
-          </div>
-        </div>
-      </div>
-      <div class="row-inline wrap">
-        <div class="field collapsible" data-collapsible>
-          <button class="collapsible-trigger" type="button" aria-expanded="false" aria-controls="procedureBlock">Prosedür</button>
-          <div id="procedureBlock" class="collapsible-body">
-            <input type="search" class="option-search" data-search-target="procedureSelect" placeholder="Prosedür ara" />
-            <select id="procedureSelect"></select>
-            <button id="doProcedureBtn" class="btn tiny">Uygula</button>
-            <div class="result-box" id="procedureResultBox"></div>
-          </div>
-        </div>
-        <div class="field collapsible" data-collapsible>
-          <button class="collapsible-trigger" type="button" aria-expanded="false" aria-controls="drugBlock">İlaç</button>
-          <div id="drugBlock" class="collapsible-body">
-            <input type="search" class="option-search" data-search-target="drugSelect" placeholder="İlaç ara" />
-            <select id="drugSelect"></select>
-            <div class="dose-row">
-              <label for="doseSelect" class="mini">Doz</label>
-              <select id="doseSelect"></select>
-              <button id="giveDrugBtn" class="btn tiny">Uygula</button>
-            </div>
-            <div class="result-box" id="drugResultBox"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <section class="mobile-card" aria-label="Hasta detayları">
       <nav class="tab-nav compact" aria-label="Vaka bölümleri">
         <button class="tab-btn active" data-tab="story">Hikaye</button>
@@ -262,7 +197,7 @@
     <small>Bu simülasyon eğitim amaçlıdır, gerçek hasta yönetiminin yerini tutmaz.</small>
   </footer>
 
-  <aside class="floating-requests" aria-label="İstek kuyruğu">
+  <aside class="floating-requests" aria-label="İstek kuyruğu" hidden>
     <div class="floating-head">
       <div>
         <p class="eyebrow mini">İstekler</p>
