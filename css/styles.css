@@ -163,6 +163,33 @@ textarea {
   align-items: center;
 }
 
+.muted {
+  color: var(--muted);
+}
+
+.host-panel {
+  margin: 0 1.5rem;
+}
+
+.host-actions {
+  flex-wrap: wrap;
+}
+
+.participant-scores {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.participant-score-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 /* Tabs */
 
 .tab-nav {
