@@ -451,7 +451,6 @@ function initActions() {
   });
 
   syncScoreToSession();
-});
 }
 
 function initFlowControls() {
