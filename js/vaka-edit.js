@@ -41,6 +41,7 @@ function attachHandlers() {
 
   $('#jsonFileInput').addEventListener('change', handleJsonImport);
   $('#downloadJsonBtn').addEventListener('click', downloadJson);
+  $('#bulkAppendBtn').addEventListener('click', handleBulkAppend);
 
   $('#applyCaseChangesBtn').addEventListener('click', () => {
     syncFormToData();
@@ -106,30 +107,10 @@ function selectCase(idx) {
 }
 
 function addNewCase() {
-  const newCase = {
+  const newCase = applyCaseDefaults({
     id: `case-${String(casesData.cases.length + 1).padStart(3, '0')}`,
-    title: 'Yeni Vaka',
-    difficulty: 'orta',
-    tags: [],
-    patient: {},
-    paramedic: '',
-    story: '',
-    exam: { vitals: '', physical: '' },
-    labs: { default: 'Bu tetkik için sonuç yok.' },
-    imaging: { default: 'Bu görüntüleme için kayıt yok.' },
-    procedures: { default: 'Prosedür sonucu kaydı yok.' },
-    drugs: [],
-    consults: [],
-    disposition: '',
-    final_diagnosis: '',
-    scoring: {
-      base: 100,
-      penalty_per_lab: 5,
-      penalty_per_imaging: 8,
-      penalty_per_procedure: 10,
-      bonus_correct_dx: 50
-    }
-  };
+    title: 'Yeni Vaka'
+  });
   casesData.cases.push(newCase);
   selectCase(casesData.cases.length - 1);
 }
@@ -162,6 +143,14 @@ function loadCaseToForm(c) {
   $('#storyInput').value = c.story || '';
   $('#examVitalsInput').value = c.exam?.vitals || '';
   $('#examPhysicalInput').value = c.exam?.physical || '';
+
+  // Media
+  $('#mediaCoverInput').value = c.media?.cover_image || 'media/defaults/case-hero.jpg';
+  $('#mediaEkgInput').value = c.media?.ekg_image || 'media/defaults/ekg-placeholder.png';
+  $('#mediaGalleryInput').value = Array.isArray(c.media?.imaging_gallery)
+    ? c.media.imaging_gallery.join(', ')
+    : '';
+  $('#mediaAudioInput').value = c.media?.audio_note || '';
 
   // Labs
   $('#labsDefaultInput').value = c.labs?.default ?? '';
@@ -223,6 +212,15 @@ function syncFormToData() {
   // Procedures
   c.procedures = readKvContainer($('#proceduresContainer'));
   c.procedures.default = $('#proceduresDefaultInput').value.trim() || 'Prosedür sonucu kaydı yok.';
+
+  // Media
+  const galleryStr = $('#mediaGalleryInput').value.trim();
+  c.media = {
+    cover_image: $('#mediaCoverInput').value.trim() || 'media/defaults/case-hero.jpg',
+    ekg_image: $('#mediaEkgInput').value.trim() || 'media/defaults/ekg-placeholder.png',
+    imaging_gallery: galleryStr ? galleryStr.split(',').map(x => x.trim()).filter(Boolean) : [],
+    audio_note: $('#mediaAudioInput').value.trim() || null
+  };
 
   // Drugs
   c.drugs = readDrugsContainer($('#drugsContainer'));
@@ -371,6 +369,71 @@ function updateRawJsonPreview() {
   syncFormToData();
   const clone = JSON.parse(JSON.stringify(casesData));
   $('#rawJsonPreview').value = JSON.stringify(clone, null, 2);
+}
+
+function handleBulkAppend() {
+  const raw = $('#bulkCasesInput').value.trim();
+  if (!raw) {
+    showValidation('Eklenecek JSON dizi boş.');
+    return;
+  }
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error('JSON bir dizi olmalı');
+    const defaultsApplied = arr.map(c => applyCaseDefaults(c));
+    casesData.cases.push(...defaultsApplied);
+    renderCaseList();
+    selectCase(casesData.cases.length - defaultsApplied.length);
+    updateRawJsonPreview();
+    showValidation(`${defaultsApplied.length} vaka eklendi.`);
+  } catch (err) {
+    showValidation('Toplu ekleme hatası: ' + err.message);
+  }
+}
+
+function applyCaseDefaults(c) {
+  const base = {
+    id: '',
+    title: '',
+    difficulty: 'orta',
+    tags: [],
+    patient: {},
+    paramedic: '',
+    story: '',
+    exam: { vitals: '', physical: '' },
+    labs: { default: 'Bu tetkik için sonuç yok.' },
+    imaging: { default: 'Bu görüntüleme için kayıt yok.' },
+    procedures: { default: 'Prosedür sonucu kaydı yok.' },
+    media: {
+      cover_image: 'media/defaults/case-hero.jpg',
+      ekg_image: 'media/defaults/ekg-placeholder.png',
+      imaging_gallery: [],
+      audio_note: null
+    },
+    drugs: [],
+    consults: [],
+    disposition: '',
+    final_diagnosis: '',
+    scoring: {
+      base: 100,
+      penalty_per_lab: 5,
+      penalty_per_imaging: 8,
+      penalty_per_procedure: 10,
+      bonus_correct_dx: 50
+    }
+  };
+
+  const merged = { ...base, ...c };
+  merged.exam = { ...base.exam, ...(c.exam || {}) };
+  merged.labs = { ...base.labs, ...(c.labs || {}) };
+  merged.imaging = { ...base.imaging, ...(c.imaging || {}) };
+  merged.procedures = { ...base.procedures, ...(c.procedures || {}) };
+  merged.media = { ...base.media, ...(c.media || {}) };
+  merged.scoring = { ...base.scoring, ...(c.scoring || {}) };
+  merged.tags = Array.isArray(c.tags) ? c.tags : [];
+  merged.drugs = Array.isArray(c.drugs) ? c.drugs : [];
+  merged.consults = Array.isArray(c.consults) ? c.consults : [];
+  return merged;
 }
 
 function handleJsonImport(e) {
