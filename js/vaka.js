@@ -9,7 +9,7 @@ import {
   loadFlowDefaults
 } from './data.js';
 import { ScoreManager } from './scoring.js';
-import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
+import { FIREBASE_CONFIG, FIREBASE_CONFIG_ISSUES, FIREBASE_CONFIG_SOURCE, FIREBASE_DEBUG, STORAGE_KEYS } from './config.js';
 import {
   ensureSession,
   initFirestore,
@@ -562,9 +562,11 @@ function initHostPanel() {
   const stopTimerBtn = $('#stopTimerBtn');
   if (stopTimerBtn) stopTimerBtn.addEventListener('click', () => handleHostAction('stopTimer'));
 
-  const configured = initFirestore(FIREBASE_CONFIG);
-  if (!configured) {
-    updateSessionStatus('Firebase yapılandırması yapılmadı; host paneli pasif.');
+  const configured = initFirestore(FIREBASE_CONFIG, { debug: FIREBASE_DEBUG, source: FIREBASE_CONFIG_SOURCE });
+  if (!configured.ready) {
+    const reasons = [configured.error || 'Firebase yapılandırması yapılmadı; host paneli pasif.'];
+    if (FIREBASE_DEBUG && FIREBASE_CONFIG_ISSUES.length) reasons.push(FIREBASE_CONFIG_ISSUES.join(' | '));
+    updateSessionStatus(reasons.join(' '));
     return;
   }
   if (sessionInput.value) {
@@ -578,9 +580,11 @@ async function connectToSession(targetSessionId) {
     return;
   }
 
-  const configured = initFirestore(FIREBASE_CONFIG);
-  if (!configured) {
-    updateSessionStatus('Firebase yapılandırması bulunamadı.');
+  const configured = initFirestore(FIREBASE_CONFIG, { debug: FIREBASE_DEBUG, source: FIREBASE_CONFIG_SOURCE });
+  if (!configured.ready) {
+    const reasons = [configured.error || 'Firebase yapılandırması bulunamadı.'];
+    if (FIREBASE_DEBUG && FIREBASE_CONFIG_ISSUES.length) reasons.push(FIREBASE_CONFIG_ISSUES.join(' | '));
+    updateSessionStatus(reasons.join(' '));
     return;
   }
 

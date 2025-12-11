@@ -25,3 +25,7 @@ Firestore kullanan host paneli ve skor senkronizasyonu için Firebase projesine 
 ## Hızlı doğrulama
 - Sayfa yüklenince konsolda `Firebase config bulunamadı veya eksik; Firestore servisleri pasif.` uyarısı görmüyorsanız yapılandırma okunmuştur.
 - Host panelindeki durum yazısı "Firestore oturumuna bağlanıldı." şeklinde güncellenmelidir.
+
+## Debug modu
+- URL'ye `?firebaseDebug=1` ekleyerek (veya global `window.FIREBASE_DEBUG = true` ayarlayarak) ayrıntılı konsol logları açılır.
+- Geçersiz alanlar, seçilen yapılandırma kaynağı ve Firestore bağlantı hataları konsola yazılır; durum satırlarında da hata mesajı görünür.

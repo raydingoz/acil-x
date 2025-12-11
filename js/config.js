@@ -24,18 +24,46 @@ const PLACEHOLDER_FIREBASE_CONFIG = {
 
 const REQUIRED_KEYS = ['apiKey', 'authDomain', 'projectId', 'appId'];
 
+function missingKeys(cfg) {
+  if (!cfg || typeof cfg !== 'object') return REQUIRED_KEYS;
+  return REQUIRED_KEYS.filter(key => !cfg[key]);
+}
+
 function isValidConfig(cfg) {
-  if (!cfg || typeof cfg !== 'object') return false;
-  return REQUIRED_KEYS.every(key => Boolean(cfg[key]));
+  return missingKeys(cfg).length === 0;
+}
+
+function detectFirebaseDebug() {
+  if (typeof window === 'undefined') return false;
+  if (window.FIREBASE_DEBUG === true) return true;
+  const params = new URLSearchParams(window.location.search);
+  const flag = params.get('firebaseDebug') || params.get('debug');
+  return flag === '1' || flag === 'true';
 }
 
 function resolveFirebaseConfig() {
+  const issues = [];
   const globalConfig = typeof window !== 'undefined' ? window.FIREBASE_CONFIG : undefined;
-  if (isValidConfig(globalConfig)) return globalConfig;
-  if (isValidConfig(PLACEHOLDER_FIREBASE_CONFIG)) return PLACEHOLDER_FIREBASE_CONFIG;
 
-  console.warn('Firebase config bulunamadı veya eksik; Firestore servisleri pasif.');
-  return null;
+  if (globalConfig) {
+    const missing = missingKeys(globalConfig);
+    if (missing.length === 0) {
+      return { config: globalConfig, source: 'window.FIREBASE_CONFIG', issues };
+    }
+    issues.push(`window.FIREBASE_CONFIG eksik alanlar: ${missing.join(', ')}`);
+  }
+
+  if (isValidConfig(PLACEHOLDER_FIREBASE_CONFIG)) {
+    return { config: PLACEHOLDER_FIREBASE_CONFIG, source: 'PLACEHOLDER_FIREBASE_CONFIG', issues };
+  }
+
+  issues.push('Geçerli Firebase yapılandırması bulunamadı; Firestore servisleri pasif.');
+  console.warn(issues[issues.length - 1]);
+  return { config: null, source: 'none', issues };
 }
 
-export const FIREBASE_CONFIG = resolveFirebaseConfig();
+const RESOLVED = resolveFirebaseConfig();
+export const FIREBASE_CONFIG = RESOLVED.config;
+export const FIREBASE_CONFIG_SOURCE = RESOLVED.source;
+export const FIREBASE_CONFIG_ISSUES = RESOLVED.issues;
+export const FIREBASE_DEBUG = detectFirebaseDebug();
