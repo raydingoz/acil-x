@@ -12,6 +12,13 @@
       <h1>Öğrenci Simülasyon Ekranı</h1>
       <p>Telefonundan katıl, 3 dakikalık süre içinde olguyu çöz ve puan topla.</p>
     </div>
+    <div class="header-actions">
+      <div class="timer-widget" aria-live="polite">
+        <span class="muted">Canlı Süre</span>
+        <div id="remainingTimeTop" class="timer-value">--:--</div>
+      </div>
+      <span id="caseStatusLocal" class="status-badge status-idle" aria-live="polite">Stabil</span>
+    </div>
     <div class="user-info">
       <label for="userNameInput">Kullanıcı:</label>
       <input id="userNameInput" type="text" aria-label="Kullanıcı adı" placeholder="Rumuzun" />
@@ -119,6 +126,56 @@
         </div>
       </section>
 
+      <section class="selection-stream" aria-label="Seçim listeleri">
+        <div class="stream-head">
+          <div>
+            <h3>Seçim Listeleri</h3>
+            <p class="muted small-text">Anamnez/Muayene ve İstek/Sonuç kayıtlarını burada takip et.</p>
+          </div>
+          <div class="stream-actions">
+            <button id="showResultsBtn" class="btn small">Sonuçları Göster</button>
+            <div class="muted small-text">Listeler otomatik güncellenir.</div>
+          </div>
+        </div>
+        <div class="stream-columns">
+          <div class="stream-card" aria-label="Anamnez ve Muayene kayıtları">
+            <div class="stream-card-head">Anamnez / Muayene</div>
+            <div class="list-scroll" role="presentation">
+              <ul id="anamnezMuayeneList" class="pill-list" aria-live="polite"></ul>
+            </div>
+          </div>
+          <div class="stream-card" aria-label="İstek ve Sonuç listesi">
+            <div class="stream-card-head">
+              <span>İstek / Sonuç</span>
+              <label class="inline-toggle">
+                <input type="checkbox" id="fastShowToggle" />
+                Hızlı Göster
+              </label>
+            </div>
+            <div class="stream-stack">
+              <div class="stream-sub">
+                <div class="stream-sub-head">İstekler</div>
+                <div class="list-scroll" role="presentation">
+                  <ul id="istekList" class="pill-list" aria-live="polite"></ul>
+                </div>
+              </div>
+              <div class="stream-sub">
+                <div class="stream-sub-head">Sonuçlar</div>
+                <div class="list-scroll" role="presentation">
+                  <ul id="sonucList" class="pill-list" aria-live="polite"></ul>
+                </div>
+              </div>
+              <div class="stream-sub">
+                <div class="stream-sub-head">İstek Kuyruğu</div>
+                <div class="list-scroll" role="presentation">
+                  <ul id="requestQueueList" class="pill-list" aria-live="polite"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <nav class="tab-nav" aria-label="Vaka bölümleri">
         <button class="tab-btn active" data-tab="paramedic">Paramedik</button>
         <button class="tab-btn" data-tab="story">Hikaye</button>
@@ -223,6 +280,19 @@
   <footer class="app-footer">
     <small>Bu simülasyon eğitim amaçlıdır, gerçek hasta yönetiminin yerini tutmaz.</small>
   </footer>
+
+  <div id="studentModalOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="studentModalTitle">
+      <div class="modal-head">
+        <h3 id="studentModalTitle">Bilgilendirme</h3>
+        <button class="btn ghost" type="button" data-close-student-modal>Kapat</button>
+      </div>
+      <div id="studentModalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn" type="button" data-close-student-modal>tamam</button>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="js/vaka.js"></script>
 </body>
