@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <title>Host Paneli</title>
+  <title>Host / Yönetici Paneli</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" defer></script>
@@ -45,17 +45,35 @@
       <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>
     </section>
 
-    <section class="card" aria-label="Oyuncu giriş bağlantısı">
+    <section class="card" aria-label="Öğrenci giriş bağlantısı">
       <div class="card-head">
         <div>
-          <h2>Player Girişi</h2>
-          <p class="muted">Projeksiyon ekranına QR yansıt</p>
+          <h2>Öğrenci Girişi</h2>
+          <p class="muted">Projeksiyon ekranına QR yansıt, öğrenciler telefonlarından bağlansın.</p>
         </div>
-        <a id="playerLink" class="btn small" href="player.html">Player Sayfası</a>
+        <a id="studentLink" class="btn small" href="student.html">Öğrenci Sayfası</a>
       </div>
       <div class="qr-box">
-        <canvas id="playerQr" aria-label="Player giriş QR kodu"></canvas>
-        <p class="muted small-text">Katılımcılar QR'ı okutarak player ekranına geçebilir.</p>
+        <canvas id="studentQr" aria-label="Öğrenci giriş QR kodu"></canvas>
+        <div class="action-row compact">
+          <input id="studentLinkField" type="text" readonly aria-label="Öğrenci bağlantısı" />
+          <button id="copyStudentLinkBtn" class="btn small" type="button">Linki Kopyala</button>
+        </div>
+        <p id="qrStatus" class="muted small-text">Katılımcılar QR'ı okutarak öğrenci simülasyon ekranına geçebilir.</p>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Aktif vaka özeti">
+      <div class="card-head">
+        <div>
+          <h2>Olgu Özeti</h2>
+          <p class="muted">Aktif vaka ve temel bilgiler</p>
+        </div>
+      </div>
+      <div class="case-summary">
+        <h3 id="activeCaseTitle">Henüz vaka seçilmedi</h3>
+        <p id="activeCaseMeta" class="muted"></p>
+        <p id="activeCaseBlurb"></p>
       </div>
     </section>
 

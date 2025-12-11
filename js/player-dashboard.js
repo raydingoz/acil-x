@@ -2,7 +2,7 @@ import { $, createEl } from './ui.js';
 import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
 import { ensureSession, initFirestore, listenToParticipantScores, listenToSession } from './firestoreService.js';
 
-const FLOW_TIMER_DURATION_MS = 12 * 60 * 1000;
+const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000;
 
 let sessionId = null;
 let sessionUnsubscribe = null;

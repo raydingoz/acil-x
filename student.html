@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Öğrenci Simülasyon Sayfası</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Öğrenci Simülasyon Ekranı</h1>
+      <p>Telefonundan katıl, 3 dakikalık süre içinde olguyu çöz ve puan topla.</p>
+    </div>
+    <div class="user-info">
+      <label for="userNameInput">Kullanıcı:</label>
+      <input id="userNameInput" type="text" aria-label="Kullanıcı adı" placeholder="Rumuzun" />
+      <button id="saveUserNameBtn" class="btn small">Kaydet</button>
+    </div>
+  </header>
+
+  <section class="card" aria-label="Oturuma katıl">
+    <div class="card-head">
+      <div>
+        <h2>Oturuma Katıl</h2>
+        <p class="muted">Öğretmenin paylaştığı oturum kodunu gir. Süre host tarafından başlatılır.</p>
+      </div>
+      <div class="timer-widget" aria-live="polite">
+        <span class="muted">Kalan Süre</span>
+        <div id="remainingTime" class="timer-value">--:--</div>
+      </div>
+    </div>
+    <div class="action-row">
+      <label for="sessionIdInput">Oturum Kodu</label>
+      <input id="sessionIdInput" type="text" placeholder="örn. trauma-bootcamp" />
+      <button id="connectSessionBtn" class="btn small">Bağlan</button>
+    </div>
+    <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>
+  </section>
+
+  <main class="vaka-layout">
+    <aside class="sidebar card" aria-label="Vaka Özeti ve Skor">
+      <h2 id="caseTitle">Vaka Başlığı</h2>
+      <p id="caseMeta"></p>
+
+      <div class="score-panel">
+        <h3>Skor</h3>
+        <p>Mevcut skor: <span id="currentScore">0</span></p>
+        <p>En iyi skor: <span id="bestScore">-</span></p>
+      </div>
+
+      <div class="case-select">
+        <label for="caseSelect">Vaka Seç:</label>
+        <select id="caseSelect" aria-label="Vaka seçimi"></select>
+      </div>
+
+      <div class="toggle-row">
+        <label for="llmToggle">LLM Entegrasyonu</label>
+        <input type="checkbox" id="llmToggle" />
+      </div>
+
+      <button id="resetCaseBtn" class="btn danger small">Vaka Sıfırla</button>
+    </aside>
+
+    <section class="main-panel card" aria-label="Vaka Detayları">
+      <section class="flow-card" aria-label="Adım adım seçim akışı">
+        <div class="flow-head">
+          <div>
+            <h2>Adım Akışı</h2>
+            <p class="muted">Anamnez → Muayene → Tetkik → Tanı/Tedavi</p>
+          </div>
+          <div class="timer-widget" aria-live="polite">
+            <span class="muted">Kalan Süre</span>
+            <div id="remainingTimeFlow" class="timer-value">--:--</div>
+          </div>
+        </div>
+
+        <div class="flow-grid">
+          <div class="flow-step">
+            <div class="flow-step-title">Anamnez</div>
+            <select id="anamnezSelect"></select>
+            <button class="btn small" data-step-submit="anamnez">Seçimi Kaydet</button>
+            <p id="anamnezHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Muayene</div>
+            <select id="muayeneSelect"></select>
+            <button class="btn small" data-step-submit="muayene">Seçimi Kaydet</button>
+            <p id="muayeneHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Tetkik</div>
+            <select id="tetkikSelect"></select>
+            <button class="btn small" data-step-submit="tetkik">Seçimi Kaydet</button>
+            <p id="tetkikHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Tanı / Tedavi</div>
+            <select id="taniSelect"></select>
+            <button class="btn small" data-step-submit="tani">Seçimi Kaydet</button>
+            <p id="taniHint" class="muted small-text"></p>
+          </div>
+        </div>
+
+        <div class="flow-placeholder" aria-live="polite">
+          <img id="flowPlaceholderImage" src="" alt="Akış görseli" />
+          <div class="flow-placeholder-texts">
+            <p id="flowPlaceholderText">Adım seçimi bekleniyor.</p>
+            <p id="flowReportText" class="muted small-text"></p>
+          </div>
+        </div>
+
+        <div class="flow-history">
+          <div class="flow-history-head">
+            <h3>Seçim Geçmişi</h3>
+            <span class="muted">Firestore snapshot ile canlı</span>
+          </div>
+          <ul id="selectionHistory" class="flow-history-list"></ul>
+        </div>
+      </section>
+
+      <nav class="tab-nav" aria-label="Vaka bölümleri">
+        <button class="tab-btn active" data-tab="paramedic">Paramedik</button>
+        <button class="tab-btn" data-tab="story">Hikaye</button>
+        <button class="tab-btn" data-tab="exam">Muayene</button>
+        <button class="tab-btn" data-tab="labs">Laboratuvar</button>
+        <button class="tab-btn" data-tab="imaging">Görüntüleme</button>
+        <button class="tab-btn" data-tab="procedures">Prosedür</button>
+        <button class="tab-btn" data-tab="drugs">İlaç/Tedavi</button>
+        <button class="tab-btn" data-tab="consults">Konsültasyon</button>
+        <button class="tab-btn" data-tab="disposition">Stabilizasyon/Nakil</button>
+        <button class="tab-btn" data-tab="diagnosis">Final Tanı</button>
+      </nav>
+
+      <div class="tab-content-container">
+        <section id="tab-paramedic" class="tab-panel active" aria-label="Paramedik Sunumu">
+          <h2>Paramedik Sunumu</h2>
+          <p id="paramedicText">Paramedik bilgisi burada görünecek.</p>
+        </section>
+
+        <section id="tab-story" class="tab-panel" aria-label="Hikaye">
+          <h2>Hikaye</h2>
+          <div id="storyText"></div>
+        </section>
+
+        <section id="tab-exam" class="tab-panel" aria-label="Muayene">
+          <h2>Muayene</h2>
+          <div id="examVitals"></div>
+          <div id="examPhysical"></div>
+        </section>
+
+        <section id="tab-labs" class="tab-panel" aria-label="Laboratuvar">
+          <h2>Laboratuvar</h2>
+          <div class="action-row">
+            <label for="labSelect">Tetkik seç:</label>
+            <select id="labSelect"></select>
+            <button id="requestLabBtn" class="btn small">İste</button>
+          </div>
+          <div class="result-box" id="labResultBox"></div>
+        </section>
+
+        <section id="tab-imaging" class="tab-panel" aria-label="Görüntüleme">
+          <h2>Görüntüleme</h2>
+          <div class="action-row">
+            <label for="imagingSelect">Görüntü seç:</label>
+            <select id="imagingSelect"></select>
+            <button id="requestImagingBtn" class="btn small">İste</button>
+          </div>
+          <div class="result-box" id="imagingResultBox"></div>
+        </section>
+
+        <section id="tab-procedures" class="tab-panel" aria-label="Prosedür">
+          <h2>Prosedür / Müdahale</h2>
+          <div class="action-row">
+            <label for="procedureSelect">Prosedür seç:</label>
+            <select id="procedureSelect"></select>
+            <button id="doProcedureBtn" class="btn small">Uygula</button>
+          </div>
+          <div class="result-box" id="procedureResultBox"></div>
+        </section>
+
+        <section id="tab-drugs" class="tab-panel" aria-label="İlaç Tedavi">
+          <h2>İlaç / Tedavi</h2>
+          <div class="action-row">
+            <label for="drugSelect">İlaç seç:</label>
+            <select id="drugSelect"></select>
+          </div>
+          <div class="action-row">
+            <label for="doseSelect">Doz:</label>
+            <select id="doseSelect"></select>
+            <button id="giveDrugBtn" class="btn small">Uygula</button>
+          </div>
+          <div class="result-box" id="drugResultBox"></div>
+        </section>
+
+        <section id="tab-consults" class="tab-panel" aria-label="Konsültasyon">
+          <h2>Konsültasyon</h2>
+          <div id="consultList"></div>
+        </section>
+
+        <section id="tab-disposition" class="tab-panel" aria-label="Stabilizasyon ve Nakil">
+          <h2>Stabilizasyon / Nakil / Taburcu</h2>
+          <textarea id="dispositionInput" rows="3" placeholder="Stabilizasyon ve nakil planını yaz..."></textarea>
+          <button id="saveDispositionBtn" class="btn small">Kaydet</button>
+          <div class="result-box" id="dispositionResultBox"></div>
+        </section>
+
+        <section id="tab-diagnosis" class="tab-panel" aria-label="Final Tanı">
+          <h2>Final Tanı</h2>
+          <input id="diagnosisInput" type="text" placeholder="Final tanıyı yaz..." />
+          <button id="submitDiagnosisBtn" class="btn primary small">Tamamla</button>
+          <div class="result-box" id="diagnosisResultBox"></div>
+        </section>
+      </div>
+    </section>
+
+    <aside class="log-panel card" aria-label="İşlem Günlüğü">
+      <h2>İşlem Günlüğü</h2>
+      <ul id="logList" class="log-list" aria-live="polite"></ul>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <small>Bu simülasyon eğitim amaçlıdır, gerçek hasta yönetiminin yerini tutmaz.</small>
+  </footer>
+
+  <script type="module" src="js/vaka.js"></script>
+</body>
+</html>
