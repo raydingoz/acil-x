@@ -11,18 +11,10 @@ import {
 
 let firestore = null;
 let initialized = false;
-const REQUIRED_CONFIG_KEYS = ['apiKey', 'authDomain', 'projectId', 'appId'];
-
-function hasValidConfig(config) {
-  return (
-    !!config &&
-    REQUIRED_CONFIG_KEYS.every(key => typeof config[key] === 'string' && config[key].trim().length > 0)
-  );
-}
 
 export function initFirestore(config) {
-  if (!hasValidConfig(config)) {
-    console.warn('Firebase config bulunamadı veya eksik; Firestore servisleri pasif.');
+  if (!config) {
+    console.warn('Firebase config bulunamadı; Firestore servisleri pasif.');
     return false;
   }
   if (!initialized) {
