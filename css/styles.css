@@ -22,12 +22,15 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: radial-gradient(circle at top, #111827 0, #020617 60%);
   color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .mobile-shell {
   background: #020617;
   color: var(--text);
   min-height: 100vh;
+  font-size: 14px;
 }
 
 .app-shell {
@@ -82,32 +85,37 @@ a:hover {
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.6rem;
 }
 
 .mobile-card {
   background: rgba(15,23,42,0.9);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 0.85rem 1rem;
+  padding: 0.7rem 0.85rem;
   box-shadow: var(--shadow);
 }
 
 .mobile-card.compact {
-  padding: 0.75rem 0.9rem;
+  padding: 0.6rem 0.8rem;
 }
 
 .title-compact {
   margin: 0.1rem 0 0.15rem;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
 }
 
 .mini {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .tiny {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+}
+
+.micro {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
 }
 
 .body-text {
@@ -126,11 +134,112 @@ a:hover {
   align-items: flex-start;
 }
 
+.stage-layout {
+  gap: 0.65rem;
+}
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.patient-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.monitor-shell {
+  position: relative;
+  border: 1px solid rgba(148,163,184,0.4);
+  border-radius: 14px;
+  padding: 0.6rem 0.8rem;
+  background: radial-gradient(circle at 10% 10%, rgba(74,222,128,0.08), rgba(15,23,42,0.6));
+  margin: 0.4rem 0 0.6rem;
+}
+
+.monitor-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 20%, rgba(94,234,212,0.08), transparent 45%);
+  pointer-events: none;
+}
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.6rem;
+  position: relative;
+  z-index: 1;
+}
+
+.monitor-reading {
+  margin: 0;
+  color: #bef264;
+  font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.story-peek {
+  padding: 0.5rem 0.65rem;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: rgba(2,6,23,0.6);
+}
+
+.action-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 70px;
+}
+
+.rail-btn {
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.8);
+  color: var(--heading);
+  border-radius: 12px;
+  padding: 0.55rem 0.45rem;
+  font-size: 0.82rem;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.rail-btn:hover {
+  background: rgba(59,130,246,0.08);
+  color: #93c5fd;
+}
+
+.rail-left {
+  align-items: flex-start;
+}
+
+.rail-right {
+  align-items: flex-end;
+}
+
 .field {
   flex: 1 1 260px;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.profile-card strong {
+  font-size: 1rem;
+}
+
+.option-search {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(2,6,23,0.65);
+  color: var(--text);
+  font-size: 0.78rem;
 }
 
 .dose-row {
@@ -244,6 +353,20 @@ a:hover {
 .tab-nav.compact {
   gap: 0.35rem;
   overflow-x: auto;
+}
+
+@media (max-width: 920px) {
+  .stage-grid {
+    grid-template-columns: 1fr;
+  }
+  .action-rail {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  .rail-left,
+  .rail-right {
+    align-items: stretch;
+  }
 }
 
 .tab-nav.compact .tab-btn {
@@ -1134,5 +1257,100 @@ textarea {
 @media (max-width: 600px) {
   .tab-nav {
     overflow-x: auto;
+  }
+}
+/* Collapsible request blocks */
+.collapsible {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 0.35rem;
+  background: rgba(2,6,23,0.4);
+}
+
+.collapsible-trigger {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--heading);
+  border: none;
+  font-weight: 600;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.collapsible-trigger:hover {
+  background: rgba(148,163,184,0.1);
+}
+
+.collapsible-body {
+  margin-top: 0.35rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Floating request dock */
+.floating-requests {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(340px, 92vw);
+  background: rgba(15,23,42,0.95);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: 0 12px 35px rgba(0,0,0,0.35);
+  z-index: 40;
+}
+
+.floating-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.request-queue {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.queue-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.5rem;
+  background: rgba(2,6,23,0.6);
+}
+
+.queue-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.floating-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.floating-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+@media (max-width: 960px) {
+  .floating-requests {
+    position: static;
+    width: 100%;
+    margin-top: 0.75rem;
   }
 }

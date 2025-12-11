@@ -41,6 +41,7 @@ const selectionState = {
   sonuclar: []
 };
 const requestQueue = [];
+const searchFilters = [];
 const animatedResultIds = new Set();
 
 const WAIT_TIME_BY_SECTION = {
@@ -87,6 +88,40 @@ const SCENARIO_RULES = [
   }
 ];
 
+const QUICK_ACTIONS = {
+  anamnez: { label: 'Anamnez', selectId: 'anamnezSelect', submitStep: 'anamnez' },
+  muayene: { label: 'Muayene', selectId: 'muayeneSelect', submitStep: 'muayene' },
+  hikaye: { label: 'Hikaye', showTextId: 'storyPeek' },
+  laboratuvar: {
+    label: 'Laboratuvar',
+    selectId: 'labSelect',
+    handler: () => handleKeyedAction('labs', 'lab', $('#labSelect'), $('#labResultBox'))
+  },
+  goruntuleme: {
+    label: 'Görüntüleme',
+    selectId: 'imagingSelect',
+    handler: () => handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox'))
+  },
+  prosedur: {
+    label: 'Prosedür',
+    selectId: 'procedureSelect',
+    handler: () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox'))
+  },
+  ilac: {
+    label: 'İlaç / Tedavi',
+    selectId: 'drugSelect',
+    handler: handleDrugAction
+  },
+  tani: {
+    label: 'Tanı',
+    prompt: 'Hızlı tanı gir:',
+    onConfirm: value => {
+      $('#diagnosisInput').value = value;
+      handleDiagnosisSubmit();
+    }
+  }
+};
+
 const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000; // 3 dakikalık varsayılan süre
 
 window.llmEnabled = false;
@@ -100,7 +135,6 @@ async function init() {
   flowDefaults = await loadFlowDefaults();
 
   casesData = await loadCasesData();
-  populateCaseSelect(casesData);
   const featuredId = getFeaturedCaseId(casesData);
   const lastCaseId = localStorage.getItem(STORAGE_KEYS.LAST_CASE_ID);
   const startCaseId = lastCaseId || featuredId;
@@ -110,34 +144,26 @@ async function init() {
   initActions();
   initHostPanel();
   initFlowControls();
+  initSearchFilters();
   initStudentModal();
+  initCollapsibles();
+  initRequestDock();
+  initQuickRails();
   initMicroInteractions();
   renderSelectionLists();
   renderRequestQueue();
+  refreshSearchSources();
 }
 
 function initUserUI() {
-  const nameInput = $('#userNameInput');
-  const saveBtn = $('#saveUserNameBtn');
-  nameInput.value = user.name || '';
-  saveBtn.addEventListener('click', () => {
-    const updated = updateUserName(nameInput.value.trim());
-    user = updated;
-  });
-}
-
-function populateCaseSelect(data) {
-  const sel = $('#caseSelect');
-  sel.innerHTML = '';
-  if (!data?.cases) return;
-  data.cases.forEach(c => {
-    const opt = createEl('option', { text: `${c.id} – ${c.title}` });
-    opt.value = c.id;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change', () => {
-    loadCaseById(sel.value);
-  });
+  if (!user.name) {
+    alert('Simülasyona başlamadan önce bir rumuz belirlemelisin.');
+    const entered = prompt('Rumuzunu yaz:')?.trim();
+    if (entered) {
+      user = updateUserName(entered);
+    }
+  }
+  $('#userNameDisplay').textContent = user.name || 'Katılımcı';
 }
 
 function loadCaseById(caseId) {
@@ -169,9 +195,12 @@ function loadCaseById(caseId) {
 
   // Hikaye
   $('#storyText').textContent = currentCase.story || 'Hikaye tanımlı değil.';
+  $('#storyPeek').textContent = currentCase.story || 'Hikaye tanımlı değil.';
 
   // Muayene
-  $('#examVitals').textContent = currentCase.exam?.vitals || 'Vital bulgular tanımlı değil.';
+  const vitalsText = currentCase.exam?.vitals || 'Vital bulgular tanımlı değil.';
+  $('#examVitals').textContent = vitalsText;
+  $('#monitorVitals').textContent = vitalsText;
   $('#examPhysical').textContent = currentCase.exam?.physical || 'Fizik muayene bulguları tanımlı değil.';
 
   // Dropdownlar
@@ -183,16 +212,18 @@ function loadCaseById(caseId) {
 
   // Konsültasyon
   const consultDiv = $('#consultList');
-  consultDiv.innerHTML = '';
-  if (Array.isArray(currentCase.consults) && currentCase.consults.length) {
-    const ul = createEl('ul');
-    currentCase.consults.forEach(c => {
-      const li = createEl('li', { text: c });
-      ul.appendChild(li);
-    });
-    consultDiv.appendChild(ul);
-  } else {
-    consultDiv.textContent = 'Tanımlı konsültasyon yok.';
+  if (consultDiv) {
+    consultDiv.innerHTML = '';
+    if (Array.isArray(currentCase.consults) && currentCase.consults.length) {
+      const ul = createEl('ul');
+      currentCase.consults.forEach(c => {
+        const li = createEl('li', { text: c });
+        ul.appendChild(li);
+      });
+      consultDiv.appendChild(ul);
+    } else {
+      consultDiv.textContent = 'Tanımlı konsültasyon yok.';
+    }
   }
 
   // Disposition default
@@ -208,6 +239,7 @@ function loadCaseById(caseId) {
 
   renderFlowOptions();
   updateFlowPlaceholder(null, null);
+  refreshSearchSources();
 
   // Skor
   scoreManager = new ScoreManager(user.id, currentCase.id, currentCase.scoring);
@@ -303,6 +335,7 @@ function initActions() {
   $('#doProcedureBtn').addEventListener('click', () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox')));
 
   $('#showResultsBtn').addEventListener('click', handleShowResults);
+  $('#showResultsBtnTop')?.addEventListener('click', handleShowResults);
   $('#quickApplyBtn')?.addEventListener('click', handleQuickApply);
   $('#openDiagnosisBtn')?.addEventListener('click', openDiagnosisModal);
 
@@ -356,6 +389,94 @@ function initFlowControls() {
     }
   });
   setActiveFlowStep(activeFlowStep);
+}
+
+function initSearchFilters() {
+  $all('[data-search-target]').forEach(input => {
+    const select = document.getElementById(input.dataset.searchTarget);
+    if (!select) return;
+    const binding = { input, select };
+    input.addEventListener('input', () => filterSelectOptions(binding));
+    searchFilters.push(binding);
+  });
+}
+
+function refreshSearchSources() {
+  searchFilters.forEach(binding => {
+    const { input, select } = binding;
+    if (!input || !select) return;
+    const source = [...select.options].map(opt => ({ value: opt.value, text: opt.textContent }));
+    input.dataset.source = JSON.stringify(source);
+    filterSelectOptions(binding, false);
+  });
+}
+
+function filterSelectOptions(binding, allowEmpty = true) {
+  const { input, select } = binding;
+  if (!input || !select) return;
+  const source = JSON.parse(input.dataset.source || '[]');
+  const prevValue = select.value;
+  const term = (input.value || '').toLowerCase();
+  const filtered = term ? source.filter(item => item.text.toLowerCase().includes(term)) : source;
+
+  select.innerHTML = '';
+  const list = filtered.length || !allowEmpty ? filtered : source;
+  if (!list.length) {
+    select.appendChild(createEl('option', { text: 'Sonuç yok', attrs: { value: '', disabled: true } }));
+    select.disabled = true;
+    return;
+  }
+
+  list.forEach(item => {
+    const opt = createEl('option', { text: item.text, attrs: { value: item.value } });
+    select.appendChild(opt);
+  });
+  select.disabled = false;
+  select.value = list.some(item => item.value === prevValue) ? prevValue : list[0].value;
+}
+
+function initQuickRails() {
+  $all('[data-quick-action]').forEach(btn => {
+    btn.addEventListener('click', () => handleQuickRailAction(btn.dataset.quickAction));
+  });
+}
+
+function handleQuickRailAction(actionKey) {
+  const action = QUICK_ACTIONS[actionKey];
+  if (!action) return;
+
+  if (action.showTextId) {
+    const text = $(`#${action.showTextId}`)?.textContent?.trim() || 'Bilgi yok.';
+    alert(`${action.label}:\n\n${text}`);
+    return;
+  }
+
+  if (action.prompt) {
+    const input = prompt(action.prompt, $('#diagnosisInput')?.value || '');
+    if (input) {
+      action.onConfirm?.(input);
+    }
+    return;
+  }
+
+  if (action.selectId) {
+    const select = $(`#${action.selectId}`);
+    if (!select) return alert('Seçenek bulunamadı.');
+    const options = [...select.options].map(opt => opt.textContent).filter(Boolean);
+    const preview = options.slice(0, 6).join(', ');
+    const entry = prompt(`${action.label} için ara${preview ? ` (${preview})` : ''}:`, '');
+    if (!entry) return;
+    const match = options.find(text => text.toLowerCase().includes(entry.toLowerCase()));
+    if (!match) {
+      alert('Eşleşme bulunamadı.');
+      return;
+    }
+    const opt = [...select.options].find(o => o.textContent === match);
+    if (opt) select.value = opt.value;
+  }
+
+  if (action.submitStep) handleFlowSubmit(action.submitStep);
+  if (typeof action.handler === 'function') action.handler();
 }
 
 function renderFlowOptions() {
@@ -728,6 +849,9 @@ function updateHostStatus(snapshot) {
   updateSessionStatus(parts.join(' | '));
   updateCaseStatusBadge(snapshot);
   updateRemainingTime();
+  if (snapshot.activeCaseId && snapshot.activeCaseId !== currentCase?.id) {
+    loadCaseById(snapshot.activeCaseId);
+  }
 }
 
 function renderParticipantScores(scores) {
@@ -1033,26 +1157,53 @@ function renderRequestQueue() {
   list.innerHTML = '';
   if (!requestQueue.length) {
     list.appendChild(createEl('li', { text: 'Kuyrukta istek yok.' }));
+    updateQueueCount();
     return;
   }
   requestQueue
     .slice(0, 20)
     .forEach(item => {
-      const meta = createEl('span', { text: `${item.waitedMinutes} dk`, className: 'pill-meta' });
-      const label = createEl('span', {
+      const meta = createEl('div', { text: `${item.waitedMinutes}/${item.targetWait} dk`, className: 'pill-meta' });
+      const label = createEl('div', {
         text: `${formatSection(item.section)} · ${item.key}`
       });
-      const li = createEl('li');
+      const actions = createEl('div', { className: 'queue-actions' });
+      const applyBtn = createEl('button', {
+        text: 'Uygula',
+        className: 'btn ghost tiny',
+        attrs: { 'data-request-action': 'apply', 'data-request-id': item.id }
+      });
+      const cancelBtn = createEl('button', {
+        text: 'İptal',
+        className: 'btn danger ghost tiny',
+        attrs: { 'data-request-action': 'cancel', 'data-request-id': item.id }
+      });
+      actions.appendChild(applyBtn);
+      actions.appendChild(cancelBtn);
+      const li = createEl('li', { className: 'queue-item' });
       li.appendChild(label);
       li.appendChild(meta);
+      li.appendChild(actions);
       list.appendChild(li);
     });
+  updateQueueCount();
+}
+
+function updateQueueCount() {
+  const countEl = $('#queueCount');
+  if (!countEl) return;
+  const count = requestQueue.length;
+  countEl.textContent = count ? `${count} bekleyen` : 'Bekleyen yok';
 }
 
 function updateVirtualTimeDisplay() {
   const label = $('#virtualTime');
   if (label) {
     label.textContent = `${simulatedMinutes} dk`;
+  }
+  const dockLabel = $('#virtualTimeDock');
+  if (dockLabel) {
+    dockLabel.textContent = `${simulatedMinutes} dk`;
   }
 }
 
@@ -1160,6 +1311,40 @@ function handleShowResults() {
   alert(`Geçen süre +${increment} dk. ${feedback}`);
 }
 
+function applyRequest(id) {
+  const idx = requestQueue.findIndex(item => item.id === id);
+  if (idx < 0) return;
+  const entry = requestQueue[idx];
+  requestQueue.splice(idx, 1);
+  recordRequestAndResult(entry.section, entry.key, `${formatSection(entry.section)} tamamlandı.`);
+  renderRequestQueue();
+}
+
+function cancelRequest(id) {
+  const idx = requestQueue.findIndex(item => item.id === id);
+  if (idx < 0) return;
+  const entry = requestQueue[idx];
+  requestQueue.splice(idx, 1);
+  appendLog({
+    section: entry.section,
+    actionType: 'cancel_request',
+    key: entry.key,
+    result: 'İstek iptal edildi.',
+    scoreDelta: 0
+  });
+  renderRequestQueue();
+}
+
+function applyAllRequests() {
+  const ids = requestQueue.map(item => item.id);
+  ids.forEach(applyRequest);
+}
+
+function cancelAllRequests() {
+  const ids = requestQueue.map(item => item.id);
+  ids.forEach(cancelRequest);
+}
+
 function evaluateScenarioRules() {
   const triggered = SCENARIO_RULES.filter(rule => rule.predicate());
   const status = triggered.find(rule => rule.status === 'kötüleşti') ? 'kötüleşti' : 'stabil';
@@ -1167,6 +1352,38 @@ function evaluateScenarioRules() {
     status,
     messages: triggered.map(rule => rule.message)
   };
+}
+
+function initCollapsibles() {
+  $all('[data-collapsible]').forEach(wrapper => {
+    const trigger = wrapper.querySelector('.collapsible-trigger');
+    const body = wrapper.querySelector('.collapsible-body');
+    if (!trigger || !body) return;
+    body.hidden = true;
+    trigger.addEventListener('click', () => {
+      const expanded = trigger.getAttribute('aria-expanded') === 'true';
+      trigger.setAttribute('aria-expanded', String(!expanded));
+      body.hidden = expanded;
+    });
+  });
+}
+
+function initRequestDock() {
+  const list = $('#requestQueueList');
+  if (!list) return;
+  list.addEventListener('click', evt => {
+    const btn = evt.target.closest('[data-request-action]');
+    if (!btn) return;
+    const id = btn.dataset.requestId;
+    if (!id) return;
+    if (btn.dataset.requestAction === 'apply') {
+      applyRequest(id);
+    } else if (btn.dataset.requestAction === 'cancel') {
+      cancelRequest(id);
+    }
+  });
+  $('#applyAllBtn')?.addEventListener('click', applyAllRequests);
+  $('#cancelAllBtn')?.addEventListener('click', cancelAllRequests);
 }
 
 function updateCaseStatusLocal(status) {
