@@ -1,12 +1,24 @@
 import { $, $all, createEl, formatTime } from './ui.js';
 import { loadCasesData, getFeaturedCaseId, findCaseById, loadOrCreateUser, updateUserName, queryLLM } from './data.js';
-import { ScoreManager } from './score.js';
+import { ScoreManager } from './scoring.js';
 import { STORAGE_KEYS } from './config.js';
+import {
+  ensureSession,
+  initFirestore,
+  listenToParticipantScores,
+  listenToSession,
+  updateParticipantScore,
+  updateSessionState
+} from './firestoreService.js';
 
 let casesData = null;
 let currentCase = null;
 let scoreManager = null;
 let user = null;
+let sessionId = null;
+let sessionUnsubscribe = null;
+let scoresUnsubscribe = null;
+let hostState = null;
 
 window.llmEnabled = false;
 
@@ -25,6 +37,7 @@ async function init() {
 
   initTabs();
   initActions();
+  initHostPanel();
 }
 
 function initUserUI() {
@@ -116,8 +129,10 @@ function loadCaseById(caseId) {
 
   // Skor
   scoreManager = new ScoreManager(user.id, currentCase.id, currentCase.scoring);
+  scoreManager.startCaseTimer();
   updateScoreUI();
   clearLog();
+  syncScoreToSession();
 }
 
 function setupKeyedSelect(selectEl, obj) {
@@ -237,6 +252,7 @@ function initActions() {
     $('#dispositionResultBox').textContent = currentCase.disposition || '';
     $('#diagnosisInput').value = '';
     $('#diagnosisResultBox').textContent = '';
+    syncScoreToSession();
   });
 }
 
@@ -247,6 +263,7 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
 
   const source = currentCase[fieldName] || {};
   const staticResult = source[key] ?? source.default ?? 'Bu işlem için tanımlı yanıt yok.';
+  const isUnnecessary = source[key] == null;
 
   // İlk LLM'ye sor, yoksa statik
   const llmAnswer = await queryLLM({
@@ -261,7 +278,7 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
   const resultText = llmAnswer || staticResult;
   resultBox.textContent = resultText;
 
-  const scoreDelta = scoreManager.applyPenalty(scoreType);
+  const scoreDelta = scoreManager.applyPenalty(scoreType, { unnecessary: isUnnecessary });
   updateScoreUI();
   appendLog({
     section: fieldName,
@@ -270,6 +287,7 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
     result: resultText,
     scoreDelta
   });
+  syncScoreToSession();
 }
 
 async function handleDrugAction() {
@@ -314,15 +332,17 @@ async function handleDiagnosisSubmit() {
   const isCorrect =
     inputDx.localeCompare(correctDx, 'tr-TR', { sensitivity: 'base' }) === 0;
 
-  const bonus = scoreManager.applyDiagnosisBonus(isCorrect);
-  scoreManager.saveBestScore();
+  const { diagnosisDelta, speedDelta, total } = scoreManager.applyDiagnosis(isCorrect);
   updateScoreUI();
 
   let msg;
   if (isCorrect) {
-    msg = `Doğru: ${correctDx}. Bonus +${bonus} puan.`;
+    msg = `Doğru: ${correctDx}. Tanı bonusu +${diagnosisDelta} puan.`;
   } else {
     msg = `Beklenen tanı: ${correctDx}. Girilen: ${inputDx}.`;
+  }
+  if (speedDelta) {
+    msg += ` Hız bonusu: +${speedDelta}.`;
   }
   $('#diagnosisResultBox').textContent = msg;
 
@@ -331,8 +351,9 @@ async function handleDiagnosisSubmit() {
     actionType: 'submit_diagnosis',
     key: null,
     result: msg,
-    scoreDelta: bonus
+    scoreDelta: total
   });
+  syncScoreToSession();
 }
 
 function updateScoreUI() {
@@ -371,4 +392,140 @@ function appendLog({ section, actionType, key, result, scoreDelta }) {
   li.appendChild(res);
   if (scoreTxt) li.appendChild(scoreEl);
   ul.prepend(li);
+}
+
+async function syncScoreToSession() {
+  if (!sessionId || !scoreManager) return;
+  await updateParticipantScore(sessionId, {
+    id: user.id,
+    name: user.name,
+    caseId: currentCase?.id,
+    score: scoreManager.currentScore
+  });
+}
+
+function initHostPanel() {
+  const sessionInput = $('#sessionIdInput');
+  if (!sessionInput) return;
+  const savedSession = localStorage.getItem(STORAGE_KEYS.SESSION_ID) || '';
+  sessionInput.value = savedSession || 'demo-session';
+
+  $('#connectSessionBtn').addEventListener('click', () => connectToSession(sessionInput.value.trim()));
+  $('#startCaseBtn').addEventListener('click', () => handleHostAction('startCase'));
+  $('#endCaseBtn').addEventListener('click', () => handleHostAction('endCase'));
+  $('#nextCaseBtn').addEventListener('click', () => handleHostAction('nextCase'));
+  $('#startTimerBtn').addEventListener('click', () => handleHostAction('startTimer'));
+  $('#stopTimerBtn').addEventListener('click', () => handleHostAction('stopTimer'));
+
+  const configured = initFirestore(window?.FIREBASE_CONFIG || null);
+  if (!configured) {
+    updateSessionStatus('Firebase yapılandırması yapılmadı; host paneli pasif.');
+    return;
+  }
+  if (sessionInput.value) {
+    connectToSession(sessionInput.value.trim());
+  }
+}
+
+async function connectToSession(targetSessionId) {
+  if (!targetSessionId) {
+    updateSessionStatus('Oturum kodu gerekli.');
+    return;
+  }
+
+  const configured = initFirestore(window?.FIREBASE_CONFIG || null);
+  if (!configured) {
+    updateSessionStatus('Firebase yapılandırması bulunamadı.');
+    return;
+  }
+
+  sessionId = targetSessionId;
+  localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionId);
+  await ensureSession(sessionId, { hostName: user?.name || 'Host' });
+
+  if (sessionUnsubscribe) sessionUnsubscribe();
+  sessionUnsubscribe = listenToSession(sessionId, updateHostStatus);
+
+  if (scoresUnsubscribe) scoresUnsubscribe();
+  scoresUnsubscribe = listenToParticipantScores(sessionId, renderParticipantScores);
+
+  updateSessionStatus('Firestore oturumuna bağlanıldı.');
+  syncScoreToSession();
+}
+
+function updateHostStatus(snapshot) {
+  hostState = snapshot;
+  if (!snapshot) {
+    updateSessionStatus('Oturum kaydı bulunamadı.');
+    return;
+  }
+  const parts = [`Durum: ${snapshot.status || 'bilinmiyor'}`];
+  if (snapshot.activeCaseId) parts.push(`Aktif vaka: ${snapshot.activeCaseId}`);
+  if (snapshot.timerRunning) parts.push('Süre çalışıyor');
+  updateSessionStatus(parts.join(' | '));
+}
+
+function renderParticipantScores(scores) {
+  const container = $('#participantScores');
+  if (!container) return;
+  container.innerHTML = '';
+  if (!scores || !scores.length) {
+    container.textContent = 'Henüz katılımcı skoru yok.';
+    return;
+  }
+  const ul = createEl('ul', { className: 'participant-score-list' });
+  scores
+    .slice()
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .forEach(s => {
+      const li = createEl('li', {
+        html: `<strong>${s.displayName || s.id}</strong> – ${s.score ?? 0} puan` +
+          (s.currentCaseId ? ` (${s.currentCaseId})` : '')
+      });
+      ul.appendChild(li);
+    });
+  container.appendChild(ul);
+}
+
+async function handleHostAction(action) {
+  if (!sessionId) {
+    updateSessionStatus('Önce bir oturuma bağlanın.');
+    return;
+  }
+  const payload = { lastAction: action };
+  if (action === 'startCase') {
+    payload.status = 'running';
+    payload.activeCaseId = currentCase?.id ?? null;
+  } else if (action === 'endCase') {
+    payload.status = 'completed';
+    payload.activeCaseId = currentCase?.id ?? null;
+  } else if (action === 'nextCase') {
+    const nextCase = findNextCase();
+    if (nextCase) {
+      loadCaseById(nextCase.id);
+      payload.activeCaseId = nextCase.id;
+    }
+    payload.status = 'pending';
+  } else if (action === 'startTimer') {
+    payload.timerRunning = true;
+    payload.timerStartedAt = Date.now();
+  } else if (action === 'stopTimer') {
+    payload.timerRunning = false;
+    payload.timerStoppedAt = Date.now();
+  }
+  await updateSessionState(sessionId, payload);
+}
+
+function updateSessionStatus(text) {
+  const statusEl = $('#sessionStatus');
+  if (statusEl) {
+    statusEl.textContent = text;
+  }
+}
+
+function findNextCase() {
+  if (!casesData?.cases?.length || !currentCase) return null;
+  const idx = casesData.cases.findIndex(c => c.id === currentCase.id);
+  const nextIdx = idx >= 0 && idx < casesData.cases.length - 1 ? idx + 1 : 0;
+  return casesData.cases[nextIdx];
 }
