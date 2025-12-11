@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vaka Editörü</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Vaka Editörü</h1>
+    <p>JSON tabanlı vaka verilerini yönet</p>
+  </header>
+
+  <main class="editor-layout">
+    <!-- Sol: vaka listesi & genel ayarlar -->
+    <aside class="sidebar card" aria-label="Vaka Listesi">
+      <h2>Vaka Listesi</h2>
+      <ul id="caseList" class="case-list"></ul>
+
+      <button id="addCaseBtn" class="btn small">Yeni Vaka Ekle</button>
+      <button id="deleteCaseBtn" class="btn danger small">Seçili Vakayı Sil</button>
+
+      <hr />
+
+      <h3>Genel Ayarlar</h3>
+      <label for="featuredCaseIdInput">Featured Case ID:</label>
+      <input id="featuredCaseIdInput" type="text" />
+
+      <button id="saveToLocalBtn" class="btn small">Yerel Olarak Kaydet</button>
+
+      <hr />
+
+      <h3>JSON İçe/Dışa Aktarım</h3>
+      <input id="jsonFileInput" type="file" accept="application/json" />
+      <button id="downloadJsonBtn" class="btn small">JSON İndir</button>
+
+      <div id="validationResult" class="validation-box"></div>
+    </aside>
+
+    <!-- Sağ: vaka formu -->
+    <section class="main-panel card" aria-label="Vaka Formu">
+      <h2 id="editorCaseTitle">Vaka Düzenleme</h2>
+
+      <form id="caseForm">
+        <div class="form-row">
+          <label for="caseIdInput">ID</label>
+          <input id="caseIdInput" required />
+        </div>
+
+        <div class="form-row">
+          <label for="caseTitleInput">Başlık</label>
+          <input id="caseTitleInput" required />
+        </div>
+
+        <div class="form-row">
+          <label for="caseDifficultyInput">Zorluk</label>
+          <select id="caseDifficultyInput">
+            <option value="kolay">kolay</option>
+            <option value="orta">orta</option>
+            <option value="zor">zor</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="caseTagsInput">Etiketler (virgülle ayrılmış)</label>
+          <input id="caseTagsInput" placeholder="kardiyoloji, travma" />
+        </div>
+
+        <fieldset class="form-fieldset">
+          <legend>Hasta Bilgisi</legend>
+          <div class="form-row">
+            <label for="patientAgeInput">Yaş</label>
+            <input id="patientAgeInput" type="number" min="0" />
+          </div>
+          <div class="form-row">
+            <label for="patientSexInput">Cinsiyet</label>
+            <select id="patientSexInput">
+              <option value="">-</option>
+              <option value="E">E</option>
+              <option value="K">K</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="patientSettingInput">Ortam</label>
+            <input id="patientSettingInput" placeholder="ambulans, acil vb." />
+          </div>
+          <div class="form-row">
+            <label for="patientTriageInput">Triaj</label>
+            <input id="patientTriageInput" placeholder="kırmızı, sarı, yeşil" />
+          </div>
+        </fieldset>
+
+        <div class="form-row">
+          <label for="storyInput">Hikaye</label>
+          <textarea id="storyInput" rows="3"></textarea>
+        </div>
+
+        <fieldset class="form-fieldset">
+          <legend>Muayene</legend>
+          <div class="form-row">
+            <label for="examVitalsInput">Vital Bulgular</label>
+            <textarea id="examVitalsInput" rows="2"></textarea>
+          </div>
+          <div class="form-row">
+            <label for="examPhysicalInput">Fizik Muayene</label>
+            <textarea id="examPhysicalInput" rows="3"></textarea>
+          </div>
+        </fieldset>
+
+        <!-- Labs -->
+        <fieldset class="form-fieldset">
+          <legend>Laboratuvar</legend>
+          <div class="form-row">
+            <label for="labsDefaultInput">Varsayılan Yanıt</label>
+            <input id="labsDefaultInput" placeholder="Bu tetkik için sonuç yok." />
+          </div>
+          <div id="labsContainer" class="kv-container"></div>
+          <button id="addLabRowBtn" type="button" class="btn small">Tetkik Satırı Ekle</button>
+        </fieldset>
+
+        <!-- Imaging -->
+        <fieldset class="form-fieldset">
+          <legend>Görüntüleme</legend>
+          <div class="form-row">
+            <label for="imagingDefaultInput">Varsayılan Yanıt</label>
+            <input id="imagingDefaultInput" placeholder="Bu görüntüleme için kayıt yok." />
+          </div>
+          <div id="imagingContainer" class="kv-container"></div>
+          <button id="addImagingRowBtn" type="button" class="btn small">Görüntüleme Satırı Ekle</button>
+        </fieldset>
+
+        <!-- Procedures -->
+        <fieldset class="form-fieldset">
+          <legend>Prosedür / Müdahale</legend>
+          <div class="form-row">
+            <label for="proceduresDefaultInput">Varsayılan Yanıt</label>
+            <input id="proceduresDefaultInput" placeholder="Prosedür sonucu kaydı yok." />
+          </div>
+          <div id="proceduresContainer" class="kv-container"></div>
+          <button id="addProcedureRowBtn" type="button" class="btn small">Prosedür Satırı Ekle</button>
+        </fieldset>
+
+        <!-- Drugs -->
+        <fieldset class="form-fieldset">
+          <legend>İlaçlar</legend>
+          <div id="drugsContainer" class="drugs-container"></div>
+          <button id="addDrugBtn" type="button" class="btn small">İlaç Ekle</button>
+        </fieldset>
+
+        <!-- Consults -->
+        <fieldset class="form-fieldset">
+          <legend>Konsültasyon</legend>
+          <div class="form-row">
+            <label for="consultsInput">Bölümler (virgülle ayrılmış)</label>
+            <input id="consultsInput" placeholder="Kardiyoloji, Göğüs cerrahisi" />
+          </div>
+        </fieldset>
+
+        <!-- Disposition (metin olarak) -->
+        <fieldset class="form-fieldset">
+          <legend>Stabilizasyon / Nakil / Taburcu</legend>
+          <div class="form-row">
+            <label for="dispositionTextInput">Açıklama</label>
+            <textarea id="dispositionTextInput" rows="2" placeholder="Varsayılan açıklama (opsiyonel)"></textarea>
+          </div>
+        </fieldset>
+
+        <!-- Final Diagnosis & Scoring -->
+        <fieldset class="form-fieldset">
+          <legend>Final Tanı ve Skorlama</legend>
+          <div class="form-row">
+            <label for="finalDiagnosisInput">Final Tanı</label>
+            <input id="finalDiagnosisInput" required />
+          </div>
+          <div class="form-row">
+            <label for="scoreBaseInput">Başlangıç Skoru</label>
+            <input id="scoreBaseInput" type="number" value="100" />
+          </div>
+          <div class="form-row">
+            <label for="penaltyLabInput">Tetkik Başına Ceza</label>
+            <input id="penaltyLabInput" type="number" value="5" />
+          </div>
+          <div class="form-row">
+            <label for="penaltyImagingInput">Görüntüleme Başına Ceza</label>
+            <input id="penaltyImagingInput" type="number" value="8" />
+          </div>
+          <div class="form-row">
+            <label for="penaltyProcedureInput">Prosedür Başına Ceza</label>
+            <input id="penaltyProcedureInput" type="number" value="10" />
+          </div>
+          <div class="form-row">
+            <label for="bonusDxInput">Doğru Tanı Bonusu</label>
+            <input id="bonusDxInput" type="number" value="50" />
+          </div>
+        </fieldset>
+
+        <div class="form-actions">
+          <button id="applyCaseChangesBtn" type="button" class="btn primary">Değişiklikleri Uygula</button>
+        </div>
+      </form>
+
+      <h3>Ham JSON Önizleme</h3>
+      <textarea id="rawJsonPreview" rows="10" class="raw-json"></textarea>
+      <div class="form-actions">
+        <button id="jsonToFormBtn" type="button" class="btn small">JSON'dan Forma Yükle</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>Vaka editörü – son düzenlenen veriler tarayıcıda saklanır.</small>
+  </footer>
+
+  <script type="module" src="js/vaka-edit.js"></script>
+</body>
+</html>
