@@ -1,7 +1,7 @@
 import { $, $all, createEl, formatTime } from './ui.js';
 import { loadCasesData, getFeaturedCaseId, findCaseById, loadOrCreateUser, updateUserName, queryLLM } from './data.js';
 import { ScoreManager } from './scoring.js';
-import { STORAGE_KEYS } from './config.js';
+import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
 import {
   ensureSession,
   initFirestore,
