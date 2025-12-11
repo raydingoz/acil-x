@@ -12,27 +12,66 @@ import {
   updateDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
+const REQUIRED_KEYS = ['apiKey', 'authDomain', 'projectId', 'appId'];
+
 let firestore = null;
 let initialized = false;
+let debugEnabled = false;
 
-export function initFirestore(config) {
-  if (!config) {
-    console.warn('Firebase config bulunamadı; Firestore servisleri pasif.');
-    return false;
+function logDebug(message, meta) {
+  if (!debugEnabled) return;
+  if (meta) {
+    console.debug(`[firestore][debug] ${message}`, meta);
+  } else {
+    console.debug(`[firestore][debug] ${message}`);
   }
-  if (!initialized) {
-    if (!getApps().length) {
-      initializeApp(config);
-    }
-    firestore = getFirestore();
-    initialized = true;
-  }
-  return true;
 }
 
-function requireFirestore() {
+function validateFirebaseConfig(config) {
+  if (!config || typeof config !== 'object') {
+    return { ok: false, error: 'Firebase config nesnesi sağlanmadı.' };
+  }
+  const missing = REQUIRED_KEYS.filter(key => !config[key]);
+  if (missing.length) {
+    return { ok: false, error: `Eksik Firebase alanları: ${missing.join(', ')}` };
+  }
+  return { ok: true };
+}
+
+export function initFirestore(config, options = {}) {
+  debugEnabled = Boolean(options.debug);
+
+  const validation = validateFirebaseConfig(config);
+  if (!validation.ok) {
+    console.warn(validation.error);
+    return { ready: false, error: validation.error };
+  }
+
+  if (!initialized) {
+    try {
+      if (!getApps().length) {
+        initializeApp(config);
+        logDebug('Firebase app initialize edildi.', { projectId: config.projectId });
+      }
+      firestore = getFirestore();
+      initialized = true;
+      logDebug('Firestore referansı alındı.');
+    } catch (err) {
+      console.error('Firestore başlatma hatası:', err);
+      return { ready: false, error: `Firebase başlatılamadı: ${err?.message || err}` };
+    }
+  } else {
+    logDebug('Mevcut Firestore örneği yeniden kullanılıyor.');
+  }
+
+  return { ready: true };
+}
+
+function requireFirestore(context = 'işlem') {
   if (!initialized || !firestore) {
-    console.warn('Firestore henüz yapılandırılmadı.');
+    const msg = `Firestore henüz yapılandırılmadı (${context}).`;
+    console.warn(msg);
+    logDebug(msg);
     return null;
   }
   return firestore;
@@ -46,7 +85,10 @@ function sessionDoc(sessionId) {
 
 export async function ensureSession(sessionId, payload = {}) {
   const ref = sessionDoc(sessionId);
-  if (!ref) return false;
+  if (!ref) {
+    logDebug('ensureSession atlandı, geçersiz sessionId.', { sessionId });
+    return false;
+  }
   await setDoc(
     ref,
     {
@@ -58,13 +100,18 @@ export async function ensureSession(sessionId, payload = {}) {
     },
     { merge: true }
   );
+  logDebug('Oturum kaydı güncellendi/oluşturuldu.', { sessionId });
   return true;
 }
 
 export async function updateSessionState(sessionId, state) {
   const ref = sessionDoc(sessionId);
-  if (!ref) return false;
+  if (!ref) {
+    logDebug('updateSessionState başarısız, oturum referansı yok.', { sessionId });
+    return false;
+  }
   await updateDoc(ref, { ...state, updatedAt: serverTimestamp() });
+  logDebug('Oturum durumu güncellendi.', { sessionId, stateKeys: Object.keys(state) });
   return true;
 }
 
@@ -81,8 +128,11 @@ export function listenToSession(sessionId, callback) {
 }
 
 export async function updateParticipantScore(sessionId, participant) {
-  const db = requireFirestore();
-  if (!db || !sessionId || !participant?.id) return false;
+  const db = requireFirestore('katılımcı skoru');
+  if (!db || !sessionId || !participant?.id) {
+    logDebug('updateParticipantScore atlandı.', { sessionId, participantId: participant?.id });
+    return false;
+  }
   const participantRef = doc(collection(doc(db, 'sessions', sessionId), 'participants'), participant.id);
   const breakdown = participant.breakdown || {};
   const payload = {
@@ -106,7 +156,7 @@ export async function updateParticipantScore(sessionId, participant) {
 }
 
 export function listenToParticipantScores(sessionId, callback) {
-  const db = requireFirestore();
+  const db = requireFirestore('skor dinleyicisi');
   if (!db || !sessionId) return () => {};
   const scoresRef = collection(doc(db, 'sessions', sessionId), 'participants');
   return onSnapshot(scoresRef, snap => {
@@ -117,7 +167,7 @@ export function listenToParticipantScores(sessionId, callback) {
 }
 
 export async function pushSelection(sessionId, payload) {
-  const db = requireFirestore();
+  const db = requireFirestore('seçim kaydı');
   if (!db || !sessionId) return false;
   const selectionsRef = collection(doc(db, 'sessions', sessionId), 'selections');
   await addDoc(selectionsRef, {
@@ -128,7 +178,7 @@ export async function pushSelection(sessionId, payload) {
 }
 
 export function listenToSelections(sessionId, callback) {
-  const db = requireFirestore();
+  const db = requireFirestore('seçim dinleyicisi');
   if (!db || !sessionId) return () => {};
   const selectionsRef = collection(doc(db, 'sessions', sessionId), 'selections');
   const q = query(selectionsRef, orderBy('createdAt', 'desc'));

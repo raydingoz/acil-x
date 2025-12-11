@@ -1,6 +1,6 @@
 import { $, createEl } from './ui.js';
 import { loadCasesData, findCaseById, getFeaturedCaseId } from './data.js';
-import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
+import { FIREBASE_CONFIG, FIREBASE_CONFIG_ISSUES, FIREBASE_CONFIG_SOURCE, FIREBASE_DEBUG, STORAGE_KEYS } from './config.js';
 import {
   ensureSession,
   initFirestore,
@@ -20,6 +20,7 @@ let qrInstance = null;
 let qrLoadPromise = null;
 let casesData = null;
 let firebaseReady = false;
+let firebaseError = '';
 
 document.addEventListener('DOMContentLoaded', () => {
   setupSessionForm();
@@ -37,12 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
       setStatus('Vaka verisi yüklenemedi, özet kapalı.');
     });
 
-  const configured = initFirestore(FIREBASE_CONFIG);
-  firebaseReady = configured;
-  if (!configured) {
-    setStatus('Firebase yapılandırması bulunamadı, Firestore pasif.');
+  const initResult = initFirestore(FIREBASE_CONFIG, { debug: FIREBASE_DEBUG, source: FIREBASE_CONFIG_SOURCE });
+  firebaseReady = initResult.ready;
+  firebaseError = initResult.error;
+  if (!initResult.ready) {
+    const reasons = [firebaseError || 'Firebase yapılandırması bulunamadı, Firestore pasif.'];
+    if (FIREBASE_DEBUG && FIREBASE_CONFIG_ISSUES.length) {
+      reasons.push(`Ayrıntılar: ${FIREBASE_CONFIG_ISSUES.join(' | ')}`);
+    }
+    setStatus(reasons.join(' '));
     toggleControls(true);
     return;
+  }
+
+  if (FIREBASE_DEBUG && FIREBASE_CONFIG_SOURCE) {
+    console.debug(`[host-dashboard] Firebase yapılandırma kaynağı: ${FIREBASE_CONFIG_SOURCE}`);
+    if (FIREBASE_CONFIG_ISSUES.length) {
+      console.debug('[host-dashboard] Firebase config uyarıları:', FIREBASE_CONFIG_ISSUES);
+    }
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -84,7 +97,8 @@ function bindHostButtons() {
 
 async function connectToSession(targetSessionId) {
   if (!firebaseReady) {
-    setStatus('Firestore devre dışı, oturum bağlanamadı.');
+    const reason = firebaseError ? `Firestore devre dışı: ${firebaseError}` : 'Firestore devre dışı, oturum bağlanamadı.';
+    setStatus(reason);
     return;
   }
 

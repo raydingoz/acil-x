@@ -1,5 +1,5 @@
 import { $, createEl } from './ui.js';
-import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
+import { FIREBASE_CONFIG, FIREBASE_CONFIG_ISSUES, FIREBASE_CONFIG_SOURCE, FIREBASE_DEBUG, STORAGE_KEYS } from './config.js';
 import { ensureSession, initFirestore, listenToParticipantScores, listenToSession } from './firestoreService.js';
 
 const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000;
@@ -13,11 +13,17 @@ let timerInterval = null;
 document.addEventListener('DOMContentLoaded', () => {
   bindConnect();
 
-  const configured = initFirestore(FIREBASE_CONFIG);
-  if (!configured) {
-    setStatus('Firebase yapılandırması bulunamadı, Firestore pasif.');
+  const initResult = initFirestore(FIREBASE_CONFIG, { debug: FIREBASE_DEBUG, source: FIREBASE_CONFIG_SOURCE });
+  if (!initResult.ready) {
+    const reasons = [initResult.error || 'Firebase yapılandırması bulunamadı, Firestore pasif.'];
+    if (FIREBASE_DEBUG && FIREBASE_CONFIG_ISSUES.length) reasons.push(FIREBASE_CONFIG_ISSUES.join(' | '));
+    setStatus(reasons.join(' '));
     toggleControls(true);
     return;
+  }
+
+  if (FIREBASE_DEBUG && FIREBASE_CONFIG_SOURCE) {
+    console.debug(`[player-dashboard] Firebase yapılandırma kaynağı: ${FIREBASE_CONFIG_SOURCE}`);
   }
 
   const params = new URLSearchParams(window.location.search);
