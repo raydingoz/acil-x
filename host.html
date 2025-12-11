@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Host Paneli</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" defer></script>
+</head>
+<body class="host-page">
+  <header class="app-header">
+    <h1>Host Paneli</h1>
+    <p>Oturum kontrolü, süre yönetimi ve canlı skor tablosu</p>
+  </header>
+
+  <main class="main-container host-grid">
+    <section class="card" aria-label="Host kontrol paneli">
+      <div class="card-head">
+        <div>
+          <h2>Oturum Kontrolü</h2>
+          <p class="muted">Başlat / Bitir / Sıradaki vaka & süre yönetimi</p>
+        </div>
+        <div class="timer-widget" aria-live="polite">
+          <span class="muted">Kalan Süre</span>
+          <div id="remainingTime" class="timer-value">--:--</div>
+        </div>
+      </div>
+
+      <div class="action-row compact">
+        <label for="sessionIdInput">Oturum Kodu</label>
+        <input id="sessionIdInput" type="text" placeholder="örn. trauma-bootcamp" />
+        <button id="connectSessionBtn" class="btn small">Bağlan</button>
+      </div>
+
+      <div class="action-row host-actions">
+        <button id="startCaseBtn" class="btn primary small">Vaka Başlat</button>
+        <button id="nextCaseBtn" class="btn small">Sıradaki Vaka</button>
+        <button id="endCaseBtn" class="btn danger small">Vaka Bitir</button>
+      </div>
+      <div class="action-row host-actions">
+        <button id="startTimerBtn" class="btn small">Süreyi Başlat</button>
+        <button id="stopTimerBtn" class="btn small">Süreyi Durdur</button>
+      </div>
+
+      <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>
+    </section>
+
+    <section class="card" aria-label="Oyuncu giriş bağlantısı">
+      <div class="card-head">
+        <div>
+          <h2>Player Girişi</h2>
+          <p class="muted">Projeksiyon ekranına QR yansıt</p>
+        </div>
+        <a id="playerLink" class="btn small" href="player.html">Player Sayfası</a>
+      </div>
+      <div class="qr-box">
+        <canvas id="playerQr" aria-label="Player giriş QR kodu"></canvas>
+        <p class="muted small-text">Katılımcılar QR'ı okutarak player ekranına geçebilir.</p>
+      </div>
+    </section>
+
+    <section class="card scoreboard-card" aria-label="Canlı skor tablosu">
+      <div class="card-head">
+        <div>
+          <h2>Skor Tablosu</h2>
+          <p class="muted">Firestore’dan canlı olarak güncellenir</p>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Katılımcı</th>
+              <th>Hız</th>
+              <th>Ceza</th>
+              <th>Toplam</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboardBody">
+            <tr>
+              <td colspan="4">Firestore oturumu bekleniyor...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>JSON tabanlı eğitim amaçlı simülasyon arayüzü</small>
+  </footer>
+
+  <script type="module" src="js/host-dashboard.js"></script>
+</body>
+</html>
