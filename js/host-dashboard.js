@@ -16,6 +16,7 @@ let scoresUnsubscribe = null;
 let hostSnapshot = null;
 let timerInterval = null;
 let qrInstance = null;
+let qrLoadPromise = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   setupSessionForm();
@@ -82,7 +83,7 @@ async function connectToSession(targetSessionId) {
 
   startTimerTicker();
   setStatus('Firestore oturumuna bağlanıldı.');
-  renderPlayerLink();
+  await renderPlayerLink();
 }
 
 function renderScoreboard(scores) {
@@ -189,7 +190,22 @@ function updateRemainingTime() {
   el.textContent = `${minutes}:${seconds}`;
 }
 
-function renderPlayerLink() {
+async function ensureQrLibrary() {
+  if (typeof QRious !== 'undefined') return true;
+  if (!qrLoadPromise) {
+    qrLoadPromise = new Promise(resolve => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js';
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  }
+  return qrLoadPromise;
+}
+
+async function renderPlayerLink() {
   const linkEl = $('#playerLink');
   if (!sessionId) return;
   const url = new URL(window.location.href);
@@ -202,7 +218,14 @@ function renderPlayerLink() {
   }
 
   const canvas = $('#playerQr');
-  if (!canvas || typeof QRious === 'undefined') return;
+  if (!canvas) return;
+
+  const hasLib = await ensureQrLibrary();
+  if (!hasLib) {
+    setStatus('QR kütüphanesi yüklenemedi, bağlantı linkini kullanın.');
+    return;
+  }
+
   if (!qrInstance) {
     qrInstance = new QRious({ element: canvas, size: 220 });
   }

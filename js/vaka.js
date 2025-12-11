@@ -556,7 +556,7 @@ function initHostPanel() {
   $('#startTimerBtn').addEventListener('click', () => handleHostAction('startTimer'));
   $('#stopTimerBtn').addEventListener('click', () => handleHostAction('stopTimer'));
 
-  const configured = initFirestore(window?.FIREBASE_CONFIG || null);
+  const configured = initFirestore(FIREBASE_CONFIG);
   if (!configured) {
     updateSessionStatus('Firebase yapılandırması yapılmadı; host paneli pasif.');
     return;
@@ -572,7 +572,7 @@ async function connectToSession(targetSessionId) {
     return;
   }
 
-  const configured = initFirestore(window?.FIREBASE_CONFIG || null);
+  const configured = initFirestore(FIREBASE_CONFIG);
   if (!configured) {
     updateSessionStatus('Firebase yapılandırması bulunamadı.');
     return;
