@@ -146,7 +146,6 @@ async function init() {
   initFlowControls();
   initSearchFilters();
   initStudentModal();
-  initCollapsibles();
   initRequestDock();
   initQuickRails();
   initMicroInteractions();
@@ -163,7 +162,9 @@ function initUserUI() {
       user = updateUserName(entered);
     }
   }
-  $('#userNameDisplay').textContent = user.name || 'Katılımcı';
+
+  const nameDisplay = $('#userNameDisplay');
+  if (nameDisplay) nameDisplay.textContent = user.name || 'Katılımcı';
 }
 
 function loadCaseById(caseId) {
@@ -199,9 +200,9 @@ function loadCaseById(caseId) {
 
   // Muayene
   const vitalsText = currentCase.exam?.vitals || 'Vital bulgular tanımlı değil.';
-  $('#examVitals').textContent = vitalsText;
-  $('#monitorVitals').textContent = vitalsText;
-  $('#examPhysical').textContent = currentCase.exam?.physical || 'Fizik muayene bulguları tanımlı değil.';
+  $('#examVitals')?.textContent = vitalsText;
+  $('#monitorVitals')?.textContent = vitalsText;
+  $('#examPhysical')?.textContent = currentCase.exam?.physical || 'Fizik muayene bulguları tanımlı değil.';
 
   // Dropdownlar
   setupKeyedSelect($('#labSelect'), currentCase.labs);
@@ -227,12 +228,16 @@ function loadCaseById(caseId) {
   }
 
   // Disposition default
-  $('#dispositionInput').value = '';
-  $('#dispositionResultBox').textContent = currentCase.disposition || '';
+  const dispositionInput = $('#dispositionInput');
+  const dispositionResult = $('#dispositionResultBox');
+  if (dispositionInput) dispositionInput.value = '';
+  if (dispositionResult) dispositionResult.textContent = currentCase.disposition || '';
 
   // Final tanı
-  $('#diagnosisInput').value = '';
-  $('#diagnosisResultBox').textContent = '';
+  const diagnosisInput = $('#diagnosisInput');
+  const diagnosisResult = $('#diagnosisResultBox');
+  if (diagnosisInput) diagnosisInput.value = '';
+  if (diagnosisResult) diagnosisResult.textContent = '';
 
   resetSelectionState();
   resetRequestQueue();
@@ -250,6 +255,7 @@ function loadCaseById(caseId) {
 }
 
 function setupKeyedSelect(selectEl, obj) {
+  if (!selectEl) return;
   selectEl.innerHTML = '';
   if (!obj) {
     const opt = createEl('option', { text: 'Tanımlı seçenek yok', attrs: { value: '' } });
@@ -275,6 +281,7 @@ function setupKeyedSelect(selectEl, obj) {
 function setupDrugsSelects(drugs) {
   const drugSelect = $('#drugSelect');
   const doseSelect = $('#doseSelect');
+  if (!drugSelect || !doseSelect) return;
   drugSelect.innerHTML = '';
   doseSelect.innerHTML = '';
 
@@ -315,6 +322,55 @@ function setupDrugsSelects(drugs) {
   updateDoses();
 }
 
+function promptForKey(section) {
+  if (!currentCase) return null;
+  const source = currentCase[section];
+  if (!source) return null;
+  const keys = Object.keys(source).filter(k => k !== 'default');
+  if (!keys.length) return null;
+  const promptText = [`Bir ${section} seç:`, ...keys.map((k, i) => `${i + 1}) ${k}`)].join('\n');
+  const input = prompt(promptText)?.trim();
+  if (!input) return null;
+  const index = parseInt(input, 10);
+  if (!Number.isNaN(index) && index >= 1 && index <= keys.length) {
+    return keys[index - 1];
+  }
+  const directMatch = keys.find(k => k.toLowerCase() === input.toLowerCase());
+  return directMatch || null;
+}
+
+function promptForDrug(drugs) {
+  if (!Array.isArray(drugs) || !drugs.length) return null;
+  const promptText = ['Bir ilaç seç:', ...drugs.map((d, i) => `${i + 1}) ${d.name || `İlaç ${i + 1}`}`)].join('\n');
+  const input = prompt(promptText)?.trim();
+  const index = parseInt(input, 10);
+  if (!Number.isNaN(index) && index >= 1 && index <= drugs.length) {
+    return index - 1;
+  }
+  const byName = drugs.findIndex(d => (d.name || '').toLowerCase() === (input || '').toLowerCase());
+  return byName >= 0 ? byName : null;
+}
+
+function promptForDose(drug) {
+  if (!drug || !Array.isArray(drug.doses) || !drug.doses.length) return null;
+  const promptText = ['Doz seç:', ...drug.doses.map((d, i) => `${i + 1}) ${d}`)].join('\n');
+  const input = prompt(promptText)?.trim();
+  const index = parseInt(input, 10);
+  if (!Number.isNaN(index) && index >= 1 && index <= drug.doses.length) {
+    return index - 1;
+  }
+  const byText = drug.doses.findIndex(d => d.toLowerCase() === (input || '').toLowerCase());
+  return byText >= 0 ? byText : null;
+}
+
+function getSelectedIndex(selectEl) {
+  if (!selectEl) return null;
+  const value = selectEl.value;
+  if (value == null || value === '') return null;
+  const index = parseInt(value, 10);
+  return Number.isNaN(index) ? null : index;
+}
+
 function initTabs() {
   const buttons = $all('.tab-btn');
   const panels = $all('.tab-panel');
@@ -330,20 +386,29 @@ function initTabs() {
 }
 
 function initActions() {
-  $('#requestLabBtn').addEventListener('click', () => handleKeyedAction('labs', 'lab', $('#labSelect'), $('#labResultBox')));
-  $('#requestImagingBtn').addEventListener('click', () => handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox')));
-  $('#doProcedureBtn').addEventListener('click', () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox')));
+  $('#requestLabBtn')?.addEventListener('click', () =>
+    handleKeyedAction('labs', 'lab', $('#labSelect'), $('#labResultBox'))
+  );
+  $('#requestImagingBtn')?.addEventListener('click', () =>
+    handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox'))
+  );
+  $('#doProcedureBtn')?.addEventListener('click', () =>
+    handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox'))
+  );
 
   $('#showResultsBtn').addEventListener('click', handleShowResults);
   $('#showResultsBtnTop')?.addEventListener('click', handleShowResults);
   $('#quickApplyBtn')?.addEventListener('click', handleQuickApply);
   $('#openDiagnosisBtn')?.addEventListener('click', openDiagnosisModal);
 
-  $('#giveDrugBtn').addEventListener('click', handleDrugAction);
+  $('#giveDrugBtn')?.addEventListener('click', handleDrugAction);
 
-  $('#saveDispositionBtn').addEventListener('click', () => {
-    const text = $('#dispositionInput').value.trim();
-    $('#dispositionResultBox').textContent = text || 'Plan kaydedildi.';
+  $('#saveDispositionBtn')?.addEventListener('click', () => {
+    const input = $('#dispositionInput');
+    if (!input) return;
+    const text = input.value.trim();
+    const result = $('#dispositionResultBox');
+    if (result) result.textContent = text || 'Plan kaydedildi.';
     appendLog({
       section: 'disposition',
       actionType: 'set_disposition',
@@ -353,24 +418,26 @@ function initActions() {
     });
   });
 
-  $('#submitDiagnosisBtn').addEventListener('click', handleDiagnosisSubmit);
+  $('#submitDiagnosisBtn')?.addEventListener('click', handleDiagnosisSubmit);
 
-  $('#llmToggle').addEventListener('change', e => {
+  $('#llmToggle')?.addEventListener('change', e => {
     window.llmEnabled = e.target.checked;
   });
 
-  $('#resetCaseBtn').addEventListener('click', () => {
+  $('#resetCaseBtn')?.addEventListener('click', () => {
     if (!currentCase || !scoreManager) return;
     scoreManager.reset();
     updateScoreUI();
     clearLog();
-    $('#labResultBox').textContent = '';
-    $('#imagingResultBox').textContent = '';
-    $('#procedureResultBox').textContent = '';
-    $('#drugResultBox').textContent = '';
-    $('#dispositionResultBox').textContent = currentCase.disposition || '';
-    $('#diagnosisInput').value = '';
-    $('#diagnosisResultBox').textContent = '';
+    $('#labResultBox')?.textContent = '';
+    $('#imagingResultBox')?.textContent = '';
+    $('#procedureResultBox')?.textContent = '';
+    $('#drugResultBox')?.textContent = '';
+    const dispositionResult = $('#dispositionResultBox');
+    if (dispositionResult) dispositionResult.textContent = currentCase.disposition || '';
+    const diagnosisInput = $('#diagnosisInput');
+    if (diagnosisInput) diagnosisInput.value = '';
+    $('#diagnosisResultBox')?.textContent = '';
     resetSelectionState();
     resetRequestQueue();
     syncScoreToSession();
@@ -616,7 +683,7 @@ function handleQuickApply() {
 
 async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
   if (!currentCase || !scoreManager) return;
-  const key = selectEl.value;
+  const key = selectEl?.value || promptForKey(fieldName);
   if (!key) return;
 
   const source = currentCase[fieldName] || {};
@@ -634,7 +701,7 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
   });
 
   const resultText = llmAnswer || staticResult;
-  resultBox.textContent = resultText;
+  if (resultBox) resultBox.textContent = resultText;
 
   const scoreDelta = scoreManager.applyPenalty(scoreType, { unnecessary: isUnnecessary });
   updateScoreUI();
@@ -659,8 +726,8 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
 async function handleDrugAction() {
   if (!currentCase || !scoreManager) return;
   const drugs = currentCase.drugs || [];
-  const drugIdx = parseInt($('#drugSelect').value, 10);
-  const doseIdx = parseInt($('#doseSelect').value, 10);
+  const drugIdx = getSelectedIndex($('#drugSelect')) ?? promptForDrug(drugs);
+  const doseIdx = getSelectedIndex($('#doseSelect')) ?? promptForDose(drugs[drugIdx]);
   const drug = drugs[drugIdx];
   if (!drug) return;
   const doseText = drug.doses?.[doseIdx] ?? '';
@@ -677,7 +744,8 @@ async function handleDrugAction() {
   });
 
   const resultText = llmAnswer || staticResult;
-  $('#drugResultBox').textContent = `${drug.name} (${doseText}): ${resultText}`;
+  const drugResult = $('#drugResultBox');
+  if (drugResult) drugResult.textContent = `${drug.name} (${doseText}): ${resultText}`;
 
   // İlaç için şimdilik skor cezası uygulamıyoruz, istersen type ekleyebilirsin
   appendLog({
@@ -724,7 +792,10 @@ async function handleDiagnosisSubmit() {
 
 function updateScoreUI() {
   $('#currentScore').textContent = scoreManager.currentScore;
-  $('#bestScore').textContent = scoreManager.bestScore != null ? scoreManager.bestScore : '-';
+  const bestScore = $('#bestScore');
+  if (bestScore) {
+    bestScore.textContent = scoreManager.bestScore != null ? scoreManager.bestScore : '-';
+  }
 }
 
 function clearLog() {
@@ -1153,10 +1224,11 @@ function sleep(ms) {
 
 function renderRequestQueue() {
   const list = $('#requestQueueList');
+  const dock = document.querySelector('.floating-requests');
   if (!list) return;
   list.innerHTML = '';
   if (!requestQueue.length) {
-    list.appendChild(createEl('li', { text: 'Kuyrukta istek yok.' }));
+    if (dock) dock.hidden = true;
     updateQueueCount();
     return;
   }
@@ -1186,8 +1258,9 @@ function renderRequestQueue() {
       li.appendChild(actions);
       list.appendChild(li);
     });
-  updateQueueCount();
-}
+    if (dock) dock.hidden = false;
+    updateQueueCount();
+  }
 
 function updateQueueCount() {
   const countEl = $('#queueCount');
