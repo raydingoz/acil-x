@@ -16,6 +16,26 @@
     </div>
   </header>
 
+  <section class="card host-panel" aria-label="Host Panel">
+    <h2>Host Panel</h2>
+    <div class="action-row">
+      <label for="sessionIdInput">Oturum Kodu</label>
+      <input id="sessionIdInput" type="text" placeholder="örn. trauma-bootcamp" />
+      <button id="connectSessionBtn" class="btn small">Bağlan</button>
+    </div>
+    <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>
+    <div class="action-row host-actions">
+      <button id="startCaseBtn" class="btn primary small">Vaka Başlat</button>
+      <button id="nextCaseBtn" class="btn small">Sıradaki Vaka</button>
+      <button id="endCaseBtn" class="btn danger small">Vaka Bitir</button>
+    </div>
+    <div class="action-row host-actions">
+      <button id="startTimerBtn" class="btn small">Süreyi Başlat</button>
+      <button id="stopTimerBtn" class="btn small">Süreyi Durdur</button>
+    </div>
+    <div id="participantScores" class="participant-scores"></div>
+  </section>
+
   <main class="vaka-layout">
     <!-- Sol panel: vaka ve skor -->
     <aside class="sidebar card" aria-label="Vaka Özeti ve Skor">
