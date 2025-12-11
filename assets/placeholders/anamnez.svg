@@ -1,0 +1,8 @@
+<svg width="360" height="200" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <rect width="360" height="200" rx="18" fill="#0f172a" stroke="#334155" stroke-width="3" />
+  <path d="M42 160h276" stroke="#475569" stroke-width="2" stroke-dasharray="6 6"/>
+  <circle cx="90" cy="90" r="46" fill="#1e293b" stroke="#f97373" stroke-width="4"/>
+  <path d="M75 90c0-10 8-18 18-18s18 8 18 18-8 18-18 18" stroke="#f97373" stroke-width="5" stroke-linecap="round"/>
+  <text x="170" y="92" fill="#e2e8f0" font-family="'Segoe UI',sans-serif" font-size="20" font-weight="600">Anamnez</text>
+  <text x="170" y="122" fill="#94a3b8" font-family="'Segoe UI',sans-serif" font-size="14">Öykü soruları, riskler</text>
+</svg>

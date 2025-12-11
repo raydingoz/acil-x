@@ -63,6 +63,62 @@
 
     <!-- Orta panel: sekmeler ve içerik -->
     <section class="main-panel card" aria-label="Vaka Detayları">
+      <section class="flow-card" aria-label="Adım adım seçim akışı">
+        <div class="flow-head">
+          <div>
+            <h2>Adım Akışı</h2>
+            <p class="muted">Anamnez → Muayene → Tetkik → Tanı/Tedavi</p>
+          </div>
+          <div class="timer-widget" aria-live="polite">
+            <span class="muted">Kalan Süre</span>
+            <div id="remainingTime" class="timer-value">--:--</div>
+          </div>
+        </div>
+
+        <div class="flow-grid">
+          <div class="flow-step">
+            <div class="flow-step-title">Anamnez</div>
+            <select id="anamnezSelect"></select>
+            <button class="btn small" data-step-submit="anamnez">Seçimi Kaydet</button>
+            <p id="anamnezHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Muayene</div>
+            <select id="muayeneSelect"></select>
+            <button class="btn small" data-step-submit="muayene">Seçimi Kaydet</button>
+            <p id="muayeneHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Tetkik</div>
+            <select id="tetkikSelect"></select>
+            <button class="btn small" data-step-submit="tetkik">Seçimi Kaydet</button>
+            <p id="tetkikHint" class="muted small-text"></p>
+          </div>
+          <div class="flow-step">
+            <div class="flow-step-title">Tanı / Tedavi</div>
+            <select id="taniSelect"></select>
+            <button class="btn small" data-step-submit="tani">Seçimi Kaydet</button>
+            <p id="taniHint" class="muted small-text"></p>
+          </div>
+        </div>
+
+        <div class="flow-placeholder" aria-live="polite">
+          <img id="flowPlaceholderImage" src="" alt="Akış görseli" />
+          <div class="flow-placeholder-texts">
+            <p id="flowPlaceholderText">Adım seçimi bekleniyor.</p>
+            <p id="flowReportText" class="muted small-text"></p>
+          </div>
+        </div>
+
+        <div class="flow-history">
+          <div class="flow-history-head">
+            <h3>Seçim Geçmişi</h3>
+            <span class="muted">Firestore snapshot ile canlı</span>
+          </div>
+          <ul id="selectionHistory" class="flow-history-list"></ul>
+        </div>
+      </section>
+
       <nav class="tab-nav" aria-label="Vaka bölümleri">
         <button class="tab-btn active" data-tab="paramedic">Paramedik</button>
         <button class="tab-btn" data-tab="story">Hikaye</button>

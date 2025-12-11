@@ -2,6 +2,7 @@ import { CASES_URL, STORAGE_KEYS, LLM_ENDPOINT } from './config.js';
 import { uuid } from './ui.js';
 
 let cachedCasesData = null;
+let cachedFlowDefaults = null;
 
 // ---------- Vaka verisi yükleme / kaydetme ----------
 
@@ -72,6 +73,52 @@ export function updateUserName(name) {
   user.name = name || user.name;
   localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
   return user;
+}
+
+// ---------- Akış varsayılanları ----------
+
+export async function loadFlowDefaults() {
+  if (cachedFlowDefaults) return cachedFlowDefaults;
+
+  try {
+    const res = await fetch('data/defaults.json');
+    if (!res.ok) throw new Error('Defaults JSON okunamadı');
+    cachedFlowDefaults = await res.json();
+    return cachedFlowDefaults;
+  } catch (e) {
+    console.warn('Defaults JSON yüklenemedi, yerleşik değerler kullanılacak.', e);
+    cachedFlowDefaults = fallbackFlowDefaults();
+    return cachedFlowDefaults;
+  }
+}
+
+function fallbackFlowDefaults() {
+  return {
+    flowPlaceholders: {
+      anamnez: {
+        image: 'assets/placeholders/anamnez.svg',
+        report: 'Anamnez detayları seçilmedi.'
+      },
+      muayene: {
+        image: 'assets/placeholders/muayene.svg',
+        report: 'Muayene bulguları seçilmedi.'
+      },
+      tetkik: {
+        image: 'assets/placeholders/tetkik.svg',
+        report: 'Tetkik sonucu bekleniyor.'
+      },
+      tani: {
+        image: 'assets/placeholders/tani.svg',
+        report: 'Tanı / tedavi kararı girilmedi.'
+      }
+    },
+    flowOptions: {
+      anamnez: ['Öyküyü dinle', 'Risk faktörlerini sorgula', 'İlaç ve alerji bilgisi al'],
+      muayene: ['Vital bulguları kontrol et', 'Baş-boyun muayenesi', 'Nörolojik değerlendirme'],
+      tetkik: ['EKG çek', 'Kan tetkiki iste', 'Görüntüleme planla'],
+      tani: ['Ön tanı oluştur', 'Tedavi başla', 'Konsültasyon iste']
+    }
+  };
 }
 
 // ---------- LLM Placeholder ----------

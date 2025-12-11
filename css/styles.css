@@ -151,6 +151,120 @@ textarea {
   flex-direction: column;
 }
 
+.flow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: linear-gradient(120deg, rgba(249,115,115,0.08), rgba(56,189,248,0.06));
+}
+
+.flow-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.flow-step {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: rgba(2,6,23,0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.flow-step-title {
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.timer-widget {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem 0.8rem;
+  text-align: right;
+  min-width: 120px;
+  background: rgba(2,6,23,0.7);
+}
+
+.timer-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.flow-placeholder {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1rem;
+  align-items: center;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: rgba(2,6,23,0.8);
+}
+
+.flow-placeholder img {
+  width: 100%;
+  max-width: 260px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0b1224;
+}
+
+.flow-placeholder-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.flow-history {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: rgba(2,6,23,0.7);
+}
+
+.flow-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.flow-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.flow-history-list li {
+  padding: 0.4rem 0.45rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.8);
+}
+
+.small-text {
+  font-size: 0.8rem;
+}
+
 .log-panel {
   overflow-y: auto;
   max-height: calc(100vh - 150px);
@@ -400,6 +514,10 @@ textarea {
 
   .log-panel {
     max-height: initial;
+  }
+
+  .flow-placeholder {
+    grid-template-columns: 1fr;
   }
 }
 

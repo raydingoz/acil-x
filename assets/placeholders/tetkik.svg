@@ -1,0 +1,8 @@
+<svg width="360" height="200" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <rect width="360" height="200" rx="18" fill="#0f172a" stroke="#334155" stroke-width="3" />
+  <path d="M42 160h276" stroke="#475569" stroke-width="2" stroke-dasharray="6 6"/>
+  <rect x="80" y="52" width="70" height="96" rx="12" fill="#1e293b" stroke="#a5b4fc" stroke-width="4"/>
+  <path d="M95 78h40M95 96h40M95 114h28" stroke="#a5b4fc" stroke-width="5" stroke-linecap="round"/>
+  <text x="170" y="92" fill="#e2e8f0" font-family="'Segoe UI',sans-serif" font-size="20" font-weight="600">Tetkik</text>
+  <text x="170" y="122" fill="#94a3b8" font-family="'Segoe UI',sans-serif" font-size="14">Laboratuvar ve görüntüleme</text>
+</svg>
