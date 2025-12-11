@@ -532,11 +532,14 @@ function appendLog({ section, actionType, key, result, scoreDelta }) {
 
 async function syncScoreToSession() {
   if (!sessionId || !scoreManager) return;
+  const breakdown = scoreManager.getBreakdown();
   await updateParticipantScore(sessionId, {
     id: user.id,
     name: user.name,
     caseId: currentCase?.id,
-    score: scoreManager.currentScore
+    score: breakdown.total,
+    breakdown,
+    elapsedMs: scoreManager.getElapsedMs()
   });
 }
 
@@ -651,6 +654,7 @@ async function handleHostAction(action) {
   } else if (action === 'startTimer') {
     payload.timerRunning = true;
     payload.timerStartedAt = Date.now();
+    payload.timerStoppedAt = null;
   } else if (action === 'stopTimer') {
     payload.timerRunning = false;
     payload.timerStoppedAt = Date.now();

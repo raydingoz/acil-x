@@ -51,6 +51,10 @@ export class ScoreManager {
     this.caseId = caseId;
     this.scoring = { ...defaultScoringConfig, ...(scoring || {}) };
     this.currentScore = calculateBaseScore(this.scoring);
+    this.baseScore = this.currentScore;
+    this.penaltyTotal = 0;
+    this.speedBonus = 0;
+    this.diagnosisScore = 0;
     this.logs = [];
     this.caseStartedAt = Date.now();
     this.loadBestScore();
@@ -103,7 +107,8 @@ export class ScoreManager {
 
   applyPenalty(type, options = {}) {
     const delta = calculateActionPenalty(type, this.scoring, options);
-    this.currentScore += delta;
+    this.penaltyTotal += delta;
+    this.currentScore = this.baseScore + this.penaltyTotal + this.diagnosisScore + this.speedBonus;
     return delta;
   }
 
@@ -112,13 +117,19 @@ export class ScoreManager {
     const diagnosisDelta = calculateDiagnosisDelta(isCorrect, this.scoring);
     const speedDelta = calculateSpeedBonus(elapsedMs, this.scoring);
     const total = diagnosisDelta + speedDelta;
-    this.currentScore += total;
+    this.diagnosisScore = diagnosisDelta;
+    this.speedBonus = speedDelta;
+    this.currentScore = this.baseScore + this.penaltyTotal + this.diagnosisScore + this.speedBonus;
     this.saveBestScore();
     return { diagnosisDelta, speedDelta, total };
   }
 
   reset() {
     this.currentScore = calculateBaseScore(this.scoring);
+    this.baseScore = this.currentScore;
+    this.penaltyTotal = 0;
+    this.speedBonus = 0;
+    this.diagnosisScore = 0;
     this.logs = [];
     this.caseStartedAt = Date.now();
   }
@@ -130,5 +141,15 @@ export class ScoreManager {
   getElapsedMs() {
     if (!this.caseStartedAt) return 0;
     return Date.now() - this.caseStartedAt;
+  }
+
+  getBreakdown() {
+    return {
+      base: this.baseScore,
+      penaltyTotal: this.penaltyTotal,
+      speedBonus: this.speedBonus,
+      diagnosisScore: this.diagnosisScore,
+      total: this.currentScore
+    };
   }
 }

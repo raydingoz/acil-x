@@ -66,12 +66,34 @@ a:hover {
   padding: 1.5rem;
 }
 
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+}
+
+.host-grid,
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+  gap: 1rem;
+}
+
 .card {
   background: rgba(15,23,42,0.9);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem 1.2rem;
   box-shadow: var(--shadow);
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .btn {
@@ -289,6 +311,53 @@ textarea {
   flex-wrap: wrap;
 }
 
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(15,23,42,0.4);
+}
+
+.data-table .score-cell {
+  font-weight: 700;
+  color: var(--heading);
+}
+
+.qr-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+
+.qr-box canvas {
+  background: white;
+  padding: 0.5rem;
+  border-radius: 10px;
+}
+
 .participant-scores {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
@@ -349,6 +418,10 @@ textarea {
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.action-row.compact {
+  flex-wrap: wrap;
 }
 
 .result-box {

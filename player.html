@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Player Skorboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="player-page">
+  <header class="app-header">
+    <h1>Player Ekranı</h1>
+    <p>Projeksiyon ekranındaki QR kodu okutarak oturuma bağlan.</p>
+  </header>
+
+  <main class="main-container player-grid">
+    <section class="card" aria-label="Oturuma bağlan">
+      <div class="card-head">
+        <div>
+          <h2>Oturum</h2>
+          <p class="muted">Skorboard canlı güncellenir</p>
+        </div>
+        <div class="timer-widget" aria-live="polite">
+          <span class="muted">Kalan Süre</span>
+          <div id="remainingTime" class="timer-value">--:--</div>
+        </div>
+      </div>
+      <div class="action-row compact">
+        <label for="sessionIdInput">Oturum Kodu</label>
+        <input id="sessionIdInput" type="text" placeholder="örn. trauma-bootcamp" />
+        <button id="connectSessionBtn" class="btn small">Bağlan</button>
+      </div>
+      <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>
+    </section>
+
+    <section class="card scoreboard-card" aria-label="Canlı skor tablosu">
+      <div class="card-head">
+        <div>
+          <h2>Skor Tablosu</h2>
+          <p class="muted">Katılımcı skorları</p>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Katılımcı</th>
+              <th>Hız</th>
+              <th>Ceza</th>
+              <th>Toplam</th>
+            </tr>
+          </thead>
+          <tbody id="scoreboardBody">
+            <tr>
+              <td colspan="4">Firestore oturumu bekleniyor...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>JSON tabanlı eğitim amaçlı simülasyon arayüzü</small>
+  </footer>
+
+  <script type="module" src="js/player-dashboard.js"></script>
+</body>
+</html>

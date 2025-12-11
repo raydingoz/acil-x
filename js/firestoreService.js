@@ -84,16 +84,24 @@ export async function updateParticipantScore(sessionId, participant) {
   const db = requireFirestore();
   if (!db || !sessionId || !participant?.id) return false;
   const participantRef = doc(collection(doc(db, 'sessions', sessionId), 'participants'), participant.id);
-  await setDoc(
-    participantRef,
-    {
-      displayName: participant.name || 'Katılımcı',
-      currentCaseId: participant.caseId || null,
-      score: participant.score ?? 0,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  const breakdown = participant.breakdown || {};
+  const payload = {
+    displayName: participant.name || 'Katılımcı',
+    currentCaseId: participant.caseId || null,
+    score: participant.score ?? 0,
+    speedBonus: breakdown.speedBonus ?? participant.speedBonus ?? 0,
+    penaltyTotal: breakdown.penaltyTotal ?? participant.penaltyTotal ?? 0,
+    diagnosisScore: breakdown.diagnosisScore ?? participant.diagnosisScore ?? 0,
+    baseScore: breakdown.base ?? participant.baseScore ?? null,
+    elapsedMs: participant.elapsedMs ?? null,
+    updatedAt: serverTimestamp()
+  };
+
+  if (Object.keys(breakdown).length) {
+    payload.scoreBreakdown = breakdown;
+  }
+
+  await setDoc(participantRef, payload, { merge: true });
   return true;
 }
 
