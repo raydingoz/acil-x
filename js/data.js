@@ -137,6 +137,12 @@ function fallbackCasesData() {
           defibrillation: 'Monofazik/bifazik cihazlara göre uygun enerji ile tek şok ardından kompresyona devam edilmesi gerekir.',
           default: 'Prosedür sonucu kaydı yok.'
         },
+        media: {
+          cover_image: 'media/defaults/case-hero.jpg',
+          ekg_image: 'media/defaults/ekg-placeholder.png',
+          imaging_gallery: ['media/defaults/xray-placeholder.png'],
+          audio_note: null
+        },
         drugs: [
           {
             name: 'Aspirin',
@@ -191,6 +197,12 @@ function fallbackCasesData() {
           blood_transfusion: 'Masif transfüzyon protokolü başlatılır.',
           pelvic_binder: 'Pelvik binder ile stabilizasyon yapılır, hemodinami bir miktar düzelebilir.',
           default: 'Prosedür sonucu kaydı yok.'
+        },
+        media: {
+          cover_image: 'media/defaults/case-hero.jpg',
+          ekg_image: null,
+          imaging_gallery: ['media/defaults/fast-placeholder.png', 'media/defaults/pelvis-placeholder.png'],
+          audio_note: 'media/defaults/ems-radio.mp3'
         },
         drugs: [
           {

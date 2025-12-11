@@ -1,0 +1,65 @@
+{
+  "featured_case_id": "case-template-001",
+  "cases": [
+    {
+      "id": "case-template-001",
+      "title": "Örnek Göğüs Ağrısı Vakasının Taslağı",
+      "difficulty": "orta",
+      "tags": ["kardiyoloji", "simülasyon"],
+      "patient": {
+        "age": 50,
+        "sex": "E",
+        "setting": "ambulans",
+        "triage": "kırmızı"
+      },
+      "paramedic": "112 ekibi tarafından evde göğüs ağrısı ile alınan hasta, ilk değerlendirmede hipotansif.",
+      "story": "50 yaşında erkek hasta, 45 dakikadır süren göğüs ağrısı, bulantı ve soğuk terleme tarifliyor.",
+      "exam": {
+        "vitals": "TA: 90/60 mmHg, Nabız: 108/dk, SpO2: %92 (oda havası)",
+        "physical": "Bilinç açık, sol kolda soğukluk, akciğer sesleri normal, kalp sesleri taşikardik."
+      },
+      "labs": {
+        "troponin": "Yüksek",
+        "d_dimer": "Normal",
+        "default": "Bu tetkik için sonuç yok."
+      },
+      "imaging": {
+        "ekg": "II, III, aVF derivasyonlarında ST elevasyonu.",
+        "xray": "Akciğer grafisi normal sınırlarda.",
+        "default": "Bu görüntüleme için kayıt yok."
+      },
+      "procedures": {
+        "defibrillation": "VF gelişirse 200 J bifazik şok.",
+        "default": "Prosedür sonucu kaydı yok."
+      },
+      "media": {
+        "cover_image": "media/defaults/case-hero.jpg",
+        "ekg_image": "media/defaults/ekg-placeholder.png",
+        "imaging_gallery": ["media/defaults/xray-placeholder.png"],
+        "audio_note": null
+      },
+      "drugs": [
+        {
+          "name": "Aspirin",
+          "doses": ["300 mg çiğneme"],
+          "response": "Ağrı azalır, antiplatelet etki başlar."
+        },
+        {
+          "name": "Nitrogliserin",
+          "doses": ["0.4 mg dil altı"],
+          "response": "Hipotansiyona yol açabileceği için dikkatli kullanılmalıdır."
+        }
+      ],
+      "consults": ["Kardiyoloji"],
+      "disposition": "Primer PCI yapılabilen merkeze sevk önerilir.",
+      "final_diagnosis": "STEMI",
+      "scoring": {
+        "base": 100,
+        "penalty_per_lab": 5,
+        "penalty_per_imaging": 8,
+        "penalty_per_procedure": 10,
+        "bonus_correct_dx": 50
+      }
+    }
+  ]
+}

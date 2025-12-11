@@ -35,6 +35,10 @@
       <input id="jsonFileInput" type="file" accept="application/json" />
       <button id="downloadJsonBtn" class="btn small">JSON İndir</button>
 
+      <h4>Toplu Vaka Ekle (JSON dizi)</h4>
+      <textarea id="bulkCasesInput" rows="6" placeholder='[{"id":"case-003",...}]'></textarea>
+      <button id="bulkAppendBtn" class="btn small">Dizi Ekleyip Forma Yükle</button>
+
       <div id="validationResult" class="validation-box"></div>
     </aside>
 
@@ -139,6 +143,27 @@
           </div>
           <div id="proceduresContainer" class="kv-container"></div>
           <button id="addProcedureRowBtn" type="button" class="btn small">Prosedür Satırı Ekle</button>
+        </fieldset>
+
+        <!-- Media -->
+        <fieldset class="form-fieldset">
+          <legend>Medya Referansları</legend>
+          <div class="form-row">
+            <label for="mediaCoverInput">Kapak Görseli</label>
+            <input id="mediaCoverInput" placeholder="media/defaults/case-hero.jpg" />
+          </div>
+          <div class="form-row">
+            <label for="mediaEkgInput">EKG Görseli</label>
+            <input id="mediaEkgInput" placeholder="media/defaults/ekg-placeholder.png" />
+          </div>
+          <div class="form-row">
+            <label for="mediaGalleryInput">Görüntüleme Galerisi (virgülle ayrılmış)</label>
+            <input id="mediaGalleryInput" placeholder="media/defaults/xray-placeholder.png" />
+          </div>
+          <div class="form-row">
+            <label for="mediaAudioInput">Ses Notu</label>
+            <input id="mediaAudioInput" placeholder="media/defaults/ems-radio.mp3" />
+          </div>
         </fieldset>
 
         <!-- Drugs -->
