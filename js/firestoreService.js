@@ -89,18 +89,16 @@ export async function ensureSession(sessionId, payload = {}) {
     logDebug('ensureSession atlandı, geçersiz sessionId.', { sessionId });
     return false;
   }
-  await setDoc(
-    ref,
-    {
-      activeCaseId: null,
-      status: 'idle',
-      timerRunning: false,
-      ...payload,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
-  logDebug('Oturum kaydı güncellendi/oluşturuldu.', { sessionId });
+
+  const data = { updatedAt: serverTimestamp() };
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined) {
+      data[key] = value;
+    }
+  });
+
+  await setDoc(ref, data, { merge: true });
+  logDebug('Oturum kaydı güncellendi/oluşturuldu.', { sessionId, payloadKeys: Object.keys(data) });
   return true;
 }
 

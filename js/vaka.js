@@ -43,7 +43,25 @@ const selectionState = {
 const requestQueue = [];
 const searchFilters = [];
 const animatedResultIds = new Set();
+const noticeTimeouts = new WeakMap();
 
+function showNotice(message, variant = 'info') {
+  if (!message) return;
+  let stack = $('#noticeStack');
+  if (!stack) {
+    stack = createEl('div', { className: 'notice-stack', attrs: { id: 'noticeStack' } });
+    document.body.appendChild(stack);
+  }
+  const notice = createEl('div', { className: `notice ${variant}`, text: message });
+  stack.appendChild(notice);
+
+  const existingTimeout = noticeTimeouts.get(notice);
+  if (existingTimeout) clearTimeout(existingTimeout);
+  const timeout = setTimeout(() => {
+    notice.remove();
+  }, 4200);
+  noticeTimeouts.set(notice, timeout);
+}
 const setTextContent = (selector, text) => {
   const el = $(selector);
   if (el) el.textContent = text;
@@ -100,17 +118,17 @@ const QUICK_ACTIONS = {
   laboratuvar: {
     label: 'Laboratuvar',
     selectId: 'labSelect',
-    handler: () => handleKeyedAction('labs', 'lab', $('#labSelect'), $('#labResultBox'))
+    handler: key => handleKeyedAction('labs', 'lab', $('#labSelect'), $('#labResultBox'), key)
   },
   goruntuleme: {
     label: 'Görüntüleme',
     selectId: 'imagingSelect',
-    handler: () => handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox'))
+    handler: key => handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox'), key)
   },
   prosedur: {
     label: 'Prosedür',
     selectId: 'procedureSelect',
-    handler: () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox'))
+    handler: key => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox'), key)
   },
   ilac: {
     label: 'İlaç / Tedavi',
@@ -161,7 +179,7 @@ async function init() {
 
 function initUserUI() {
   if (!user.name) {
-    alert('Simülasyona başlamadan önce bir rumuz belirlemelisin.');
+    showNotice('Simülasyona başlamadan önce bir rumuz belirlemelisin.', 'warning');
     const entered = prompt('Rumuzunu yaz:')?.trim();
     if (entered) {
       user = updateUserName(entered);
@@ -517,42 +535,170 @@ function initQuickRails() {
   });
 }
 
+function getQuickActionOptions(actionKey, action) {
+  if (action?.selectId) {
+    const select = $(`#${action.selectId}`);
+    if (select && select.options.length) {
+      return [...select.options].map(opt => ({ value: opt.value, label: opt.textContent }));
+    }
+  }
+  if (!currentCase) return [];
+
+  if (actionKey === 'laboratuvar') {
+    return Object.keys(currentCase.labs || {})
+      .filter(k => k !== 'default')
+      .map(key => ({ value: key, label: key }));
+  }
+  if (actionKey === 'goruntuleme') {
+    return Object.keys(currentCase.imaging || {})
+      .filter(k => k !== 'default')
+      .map(key => ({ value: key, label: key }));
+  }
+  if (actionKey === 'prosedur') {
+    return Object.keys(currentCase.procedures || {})
+      .filter(k => k !== 'default')
+      .map(key => ({ value: key, label: key }));
+  }
+  if (actionKey === 'ilac') {
+    return (currentCase.drugs || []).map((drug, idx) => ({
+      value: String(idx),
+      label: drug.name || `İlaç ${idx + 1}`
+    }));
+  }
+
+  if (action?.selectId) {
+    // Son çare, ilgili select yoksa bile akış seçeneklerini topla
+    const flowOptions = flowDefaults?.flowOptions?.[action.submitStep] || [];
+    const caseOptions = collectCaseSpecificOptions(action.submitStep) || [];
+    const unique = [...new Set([...flowOptions, ...caseOptions])];
+    return unique.map(item => ({ value: item, label: item }));
+  }
+
+  return [];
+}
+
+function openOptionPickerModal({ title, description, options, onSelect }) {
+  const overlay = $('#studentModalOverlay');
+  const body = $('#studentModalBody');
+  if (!overlay || !body) return;
+  $('#studentModalTitle').textContent = title;
+
+  const optionListId = 'quickOptionList';
+  const searchId = 'quickOptionSearch';
+  body.innerHTML = `
+    <p class="muted">${description || 'Listeden bir seçenek seçebilirsin.'}</p>
+    <input id="${searchId}" type="search" class="option-search" placeholder="Ara..." />
+    <div id="${optionListId}" class="option-list"></div>
+  `;
+
+  const listEl = document.getElementById(optionListId);
+  const searchEl = document.getElementById(searchId);
+
+  const renderList = items => {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    if (!items.length) {
+      listEl.appendChild(createEl('div', { text: 'Seçenek bulunamadı.', className: 'muted' }));
+      return;
+    }
+    items.forEach(item => {
+      const btn = createEl('button', {
+        text: item.label,
+        className: 'btn block ghost',
+        attrs: { type: 'button', 'data-option-value': item.value }
+      });
+      listEl.appendChild(btn);
+    });
+  };
+
+  renderList(options);
+
+  listEl?.addEventListener('click', evt => {
+    const btn = evt.target.closest('[data-option-value]');
+    if (!btn) return;
+    const value = btn.dataset.optionValue;
+    onSelect?.(value);
+    closeStudentModal();
+  });
+
+  searchEl?.addEventListener('input', () => {
+    const term = searchEl.value.toLowerCase();
+    const filtered = options.filter(opt => opt.label.toLowerCase().includes(term));
+    renderList(filtered);
+  });
+
+  setModalActions([{ text: 'Kapat', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } }]);
+  openStudentModal();
+}
+
+function openInfoModal(title, content) {
+  const body = $('#studentModalBody');
+  if (!body) return;
+  $('#studentModalTitle').textContent = title;
+  body.innerHTML = `<p>${content}</p>`;
+  setModalActions();
+  openStudentModal();
+}
+
+function openInputModal({ title, prompt, defaultValue = '', onConfirm }) {
+  const body = $('#studentModalBody');
+  if (!body) return;
+  $('#studentModalTitle').textContent = title;
+  body.innerHTML = `
+    <p>${prompt}</p>
+    <input type="text" id="quickInputField" value="${defaultValue}" />
+  `;
+  setModalActions([
+    { text: 'Kaydet', className: 'btn primary', attrs: { id: 'quickInputConfirm' } },
+    { text: 'Vazgeç', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } }
+  ]);
+  openStudentModal();
+  $('#quickInputConfirm')?.addEventListener('click', () => {
+    const val = $('#quickInputField')?.value?.trim();
+    if (val) onConfirm?.(val);
+    closeStudentModal();
+  });
+}
+
 function handleQuickRailAction(actionKey) {
   const action = QUICK_ACTIONS[actionKey];
   if (!action) return;
 
   if (action.showTextId) {
     const text = $(`#${action.showTextId}`)?.textContent?.trim() || 'Bilgi yok.';
-    alert(`${action.label}:\n\n${text}`);
+    openInfoModal(action.label, text);
     return;
   }
 
   if (action.prompt) {
-    const input = prompt(action.prompt, $('#diagnosisInput')?.value || '');
-    if (input) {
-      action.onConfirm?.(input);
-    }
+    openInputModal({
+      title: action.label,
+      prompt: action.prompt,
+      defaultValue: $('#diagnosisInput')?.value || '',
+      onConfirm: action.onConfirm
+    });
     return;
   }
 
-  if (action.selectId) {
-    const select = $(`#${action.selectId}`);
-    if (!select) return alert('Seçenek bulunamadı.');
-    const options = [...select.options].map(opt => opt.textContent).filter(Boolean);
-    const preview = options.slice(0, 6).join(', ');
-    const entry = prompt(`${action.label} için ara${preview ? ` (${preview})` : ''}:`, '');
-    if (!entry) return;
-    const match = options.find(text => text.toLowerCase().includes(entry.toLowerCase()));
-    if (!match) {
-      alert('Eşleşme bulunamadı.');
-      return;
-    }
-    const opt = [...select.options].find(o => o.textContent === match);
-    if (opt) select.value = opt.value;
+  const options = getQuickActionOptions(actionKey, action);
+  if (!options.length) {
+    showNotice('Seçenek bulunamadı', 'warning');
+    return;
   }
 
-  if (action.submitStep) handleFlowSubmit(action.submitStep);
-  if (typeof action.handler === 'function') action.handler();
+  openOptionPickerModal({
+    title: action.label,
+    description: 'Butonu uygulamak için bir seçenek seç.',
+    options,
+    onSelect: value => {
+      if (action.selectId) {
+        const select = $(`#${action.selectId}`);
+        if (select) select.value = value;
+      }
+      if (action.submitStep) handleFlowSubmit(action.submitStep);
+      if (typeof action.handler === 'function') action.handler(value);
+    }
+  });
 }
 
 function renderFlowOptions() {
@@ -690,9 +836,9 @@ function handleQuickApply() {
   handleFlowSubmit(activeFlowStep);
 }
 
-async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
+async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox, keyOverride) {
   if (!currentCase || !scoreManager) return;
-  const key = selectEl?.value || promptForKey(fieldName);
+  const key = keyOverride || selectEl?.value || promptForKey(fieldName);
   if (!key) return;
 
   const source = currentCase[fieldName] || {};
@@ -1050,7 +1196,7 @@ function initMicroInteractions() {
   $all('[data-trigger-alert]').forEach(btn => {
     btn.addEventListener('click', () => {
       const message = btn.dataset.triggerAlert || 'Bilgilendirme gönderildi.';
-      alert(message);
+      showNotice(message, 'info');
     });
   });
 
@@ -1291,7 +1437,7 @@ function updateVirtualTimeDisplay() {
 
 function showExamAlert(choice) {
   const message = `Muayene seçimin kaydedildi: ${choice}`;
-  alert(message);
+  showNotice(message, 'success');
 }
 
 function showRequestModal(section, key, resultText) {
@@ -1358,7 +1504,7 @@ function finalizeDiagnosisSelection(choice) {
     `Beklenen tanı ile uyum: ${isAligned ? 'Evet' : 'Hayır'}`,
     `Kaydedilen adım: ${flowHistory.length} seçim`
   ];
-  alert(summaryLines.join('\n'));
+  showNotice(summaryLines.join(' • '), isAligned ? 'success' : 'info');
 }
 
 function handleShowResults() {
@@ -1390,7 +1536,7 @@ function handleShowResults() {
   const feedback = scenarioResult.messages.length
     ? scenarioResult.messages.join(' ')
     : 'Vaka stabil seyrediyor.';
-  alert(`Geçen süre +${increment} dk. ${feedback}`);
+  showNotice(`Geçen süre +${increment} dk. ${feedback}`, 'info');
 }
 
 function applyRequest(id) {
