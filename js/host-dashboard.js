@@ -1,4 +1,5 @@
 import { $, createEl } from './ui.js';
+import { loadCasesData, findCaseById, getFeaturedCaseId } from './data.js';
 import { FIREBASE_CONFIG, STORAGE_KEYS } from './config.js';
 import {
   ensureSession,
@@ -8,7 +9,7 @@ import {
   updateSessionState
 } from './firestoreService.js';
 
-const FLOW_TIMER_DURATION_MS = 12 * 60 * 1000;
+const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000;
 
 let sessionId = null;
 let sessionUnsubscribe = null;
@@ -17,12 +18,27 @@ let hostSnapshot = null;
 let timerInterval = null;
 let qrInstance = null;
 let qrLoadPromise = null;
+let casesData = null;
+let firebaseReady = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   setupSessionForm();
   bindHostButtons();
 
+  loadCasesData()
+    .then(data => {
+      casesData = data;
+      if (!hostSnapshot?.activeCaseId && data) {
+        const featured = getFeaturedCaseId(data);
+        if (featured) updateCaseSummary(featured);
+      }
+    })
+    .catch(() => {
+      setStatus('Vaka verisi yüklenemedi, özet kapalı.');
+    });
+
   const configured = initFirestore(FIREBASE_CONFIG);
+  firebaseReady = configured;
   if (!configured) {
     setStatus('Firebase yapılandırması bulunamadı, Firestore pasif.');
     toggleControls(true);
@@ -67,6 +83,11 @@ function bindHostButtons() {
 }
 
 async function connectToSession(targetSessionId) {
+  if (!firebaseReady) {
+    setStatus('Firestore devre dışı, oturum bağlanamadı.');
+    return;
+  }
+
   sessionId = targetSessionId;
   localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionId);
   await ensureSession(sessionId, { hostName: 'Dashboard' });
@@ -83,7 +104,7 @@ async function connectToSession(targetSessionId) {
 
   startTimerTicker();
   setStatus('Firestore oturumuna bağlanıldı.');
-  await renderPlayerLink();
+  await renderStudentLink();
 }
 
 function renderScoreboard(scores) {
@@ -165,6 +186,10 @@ function renderSessionStatus() {
   if (hostSnapshot.timerRunning) parts.push('Süre çalışıyor');
 
   statusEl.textContent = parts.join(' | ');
+
+  if (hostSnapshot.activeCaseId) {
+    updateCaseSummary(hostSnapshot.activeCaseId);
+  }
 }
 
 function startTimerTicker() {
@@ -205,23 +230,42 @@ async function ensureQrLibrary() {
   return qrLoadPromise;
 }
 
-async function renderPlayerLink() {
-  const linkEl = $('#playerLink');
+async function renderStudentLink() {
+  const linkEl = $('#studentLink');
+  const fieldEl = $('#studentLinkField');
+  const copyBtn = $('#copyStudentLinkBtn');
+  const statusEl = $('#qrStatus');
   if (!sessionId) return;
   const url = new URL(window.location.href);
-  url.pathname = url.pathname.replace(/[^/]+$/, 'player.html');
+  url.pathname = url.pathname.replace(/[^/]+$/, 'student.html');
   url.searchParams.set('session', sessionId);
 
   if (linkEl) {
     linkEl.href = url.toString();
-    linkEl.textContent = 'Player Linkini Aç';
+    linkEl.textContent = 'Öğrenci Linkini Aç';
   }
 
-  const canvas = $('#playerQr');
+  if (fieldEl) {
+    fieldEl.value = url.toString();
+  }
+
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url.toString());
+        if (statusEl) statusEl.textContent = 'Bağlantı kopyalandı.';
+      } catch (err) {
+        if (statusEl) statusEl.textContent = 'Kopyalama başarısız, manuel kopyalayın.';
+      }
+    };
+  }
+
+  const canvas = $('#studentQr');
   if (!canvas) return;
 
   const hasLib = await ensureQrLibrary();
   if (!hasLib) {
+    if (statusEl) statusEl.textContent = 'QR kütüphanesi yüklenemedi, bağlantı linkini kullanın.';
     setStatus('QR kütüphanesi yüklenemedi, bağlantı linkini kullanın.');
     return;
   }
@@ -230,6 +274,7 @@ async function renderPlayerLink() {
     qrInstance = new QRious({ element: canvas, size: 220 });
   }
   qrInstance.set({ value: url.toString() });
+  if (statusEl) statusEl.textContent = 'QR hazır. Öğrenciler link veya QR ile girebilir.';
 }
 
 function setStatus(text) {
@@ -242,4 +287,31 @@ function toggleControls(disabled) {
     const btn = $(`#${id}`);
     if (btn) btn.disabled = disabled;
   });
+}
+
+function updateCaseSummary(caseId) {
+  const titleEl = $('#activeCaseTitle');
+  const metaEl = $('#activeCaseMeta');
+  const blurbEl = $('#activeCaseBlurb');
+  if (!titleEl || !casesData?.cases) return;
+
+  const found = findCaseById(casesData, caseId) || findCaseById(casesData, getFeaturedCaseId(casesData));
+  if (!found) return;
+
+  titleEl.textContent = `${found.id} – ${found.title}`;
+
+  const metaParts = [];
+  if (found.difficulty) metaParts.push(`Zorluk: ${found.difficulty}`);
+  if (found.patient) {
+    const p = found.patient;
+    const txt = [
+      p.age != null ? `${p.age}Y` : '',
+      p.sex ? p.sex : '',
+      p.setting ? `(${p.setting})` : '',
+      p.triage ? `Triaj: ${p.triage}` : ''
+    ].filter(Boolean).join(' ');
+    if (txt) metaParts.push(txt);
+  }
+  metaEl.textContent = metaParts.join(' | ');
+  blurbEl.textContent = found.paramedic || found.story || 'Kısa vaka özeti bekleniyor.';
 }

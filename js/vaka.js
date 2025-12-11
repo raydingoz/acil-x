@@ -34,7 +34,7 @@ let flowDefaults = null;
 let flowHistory = [];
 let timerInterval = null;
 
-const FLOW_TIMER_DURATION_MS = 12 * 60 * 1000; // 12 dakikalık varsayılan süre
+const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000; // 3 dakikalık varsayılan süre
 
 window.llmEnabled = false;
 
@@ -545,16 +545,22 @@ async function syncScoreToSession() {
 
 function initHostPanel() {
   const sessionInput = $('#sessionIdInput');
-  if (!sessionInput) return;
+  const connectBtn = $('#connectSessionBtn');
+  if (!sessionInput || !connectBtn) return;
   const savedSession = localStorage.getItem(STORAGE_KEYS.SESSION_ID) || '';
   sessionInput.value = savedSession || 'demo-session';
 
-  $('#connectSessionBtn').addEventListener('click', () => connectToSession(sessionInput.value.trim()));
-  $('#startCaseBtn').addEventListener('click', () => handleHostAction('startCase'));
-  $('#endCaseBtn').addEventListener('click', () => handleHostAction('endCase'));
-  $('#nextCaseBtn').addEventListener('click', () => handleHostAction('nextCase'));
-  $('#startTimerBtn').addEventListener('click', () => handleHostAction('startTimer'));
-  $('#stopTimerBtn').addEventListener('click', () => handleHostAction('stopTimer'));
+  connectBtn.addEventListener('click', () => connectToSession(sessionInput.value.trim()));
+  const startBtn = $('#startCaseBtn');
+  if (startBtn) startBtn.addEventListener('click', () => handleHostAction('startCase'));
+  const endBtn = $('#endCaseBtn');
+  if (endBtn) endBtn.addEventListener('click', () => handleHostAction('endCase'));
+  const nextBtn = $('#nextCaseBtn');
+  if (nextBtn) nextBtn.addEventListener('click', () => handleHostAction('nextCase'));
+  const startTimerBtn = $('#startTimerBtn');
+  if (startTimerBtn) startTimerBtn.addEventListener('click', () => handleHostAction('startTimer'));
+  const stopTimerBtn = $('#stopTimerBtn');
+  if (stopTimerBtn) stopTimerBtn.addEventListener('click', () => handleHostAction('stopTimer'));
 
   const configured = initFirestore(FIREBASE_CONFIG);
   if (!configured) {
@@ -694,10 +700,12 @@ function startTimerTicker() {
 }
 
 function updateRemainingTime() {
-  const el = $('#remainingTime');
-  if (!el) return;
+  const targets = ['#remainingTime', '#remainingTimeFlow']
+    .map(sel => $(sel))
+    .filter(Boolean);
+  if (!targets.length) return;
   if (!hostState?.timerRunning || !hostState?.timerStartedAt) {
-    el.textContent = '--:--';
+    targets.forEach(el => (el.textContent = '--:--'));
     return;
   }
   const started = hostState.timerStartedAt;
@@ -707,5 +715,5 @@ function updateRemainingTime() {
   const remaining = Math.max(FLOW_TIMER_DURATION_MS - elapsed, 0);
   const minutes = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const seconds = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
-  el.textContent = `${minutes}:${seconds}`;
+  targets.forEach(el => (el.textContent = `${minutes}:${seconds}`));
 }
