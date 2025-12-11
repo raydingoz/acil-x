@@ -33,6 +33,58 @@ let selectionUnsubscribe = null;
 let flowDefaults = null;
 let flowHistory = [];
 let timerInterval = null;
+let simulatedMinutes = 0;
+const selectionState = {
+  anamnezMuayene: [],
+  istekler: [],
+  sonuclar: []
+};
+const requestQueue = [];
+const animatedResultIds = new Set();
+
+const WAIT_TIME_BY_SECTION = {
+  labs: 20,
+  imaging: 30,
+  procedures: 10
+};
+
+const SCENARIO_RULES = [
+  {
+    id: 'hemorrhage_ct_delay',
+    status: 'kötüleşti',
+    message:
+      'Kanama kontrolü yapılmadı ve BT beklerken gecikme yaşandı; hastanın kan basıncı düşüyor.',
+    predicate: () => {
+      const hasBleeding = selectionState.anamnezMuayene.some(item =>
+        (item.choice || '').toLowerCase().includes('kanama')
+      );
+      const bandajYapildi = selectionState.istekler.some(
+        item => item.section === 'procedures' && (item.key || '').toLowerCase().includes('bandaj')
+      );
+      const ctDelayed = requestQueue.some(
+        item =>
+          item.section === 'imaging' &&
+          (item.key || '').toLowerCase().includes('bt') &&
+          item.waitedMinutes >= 30
+      );
+      return hasBleeding && !bandajYapildi && ctDelayed;
+    }
+  },
+  {
+    id: 'aby_only_biochem',
+    status: 'kötüleşti',
+    message: 'ABY vakasında sadece biyokimya istendi; 1 saat içinde pH düşüyor.',
+    predicate: () => {
+      const hasABY = selectionState.anamnezMuayene.some(item =>
+        (item.choice || '').toLowerCase().includes('aby')
+      );
+      const labEntries = requestQueue.filter(item => item.section === 'labs');
+      if (!labEntries.length) return false;
+      const onlyBiochem = labEntries.every(item => (item.key || '').toLowerCase().includes('biyokimya'));
+      return hasABY && onlyBiochem && simulatedMinutes >= 60;
+    }
+  }
+];
 
 const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000; // 3 dakikalık varsayılan süre
 
@@ -57,6 +109,10 @@ async function init() {
   initActions();
   initHostPanel();
   initFlowControls();
+  initStudentModal();
+  initMicroInteractions();
+  renderSelectionLists();
+  renderRequestQueue();
 }
 
 function initUserUI() {
@@ -145,6 +201,9 @@ function loadCaseById(caseId) {
   // Final tanı
   $('#diagnosisInput').value = '';
   $('#diagnosisResultBox').textContent = '';
+
+  resetSelectionState();
+  resetRequestQueue();
 
   renderFlowOptions();
   updateFlowPlaceholder(null, null);
@@ -242,6 +301,8 @@ function initActions() {
   $('#requestImagingBtn').addEventListener('click', () => handleKeyedAction('imaging', 'imaging', $('#imagingSelect'), $('#imagingResultBox')));
   $('#doProcedureBtn').addEventListener('click', () => handleKeyedAction('procedures', 'procedure', $('#procedureSelect'), $('#procedureResultBox')));
 
+  $('#showResultsBtn').addEventListener('click', handleShowResults);
+
   $('#giveDrugBtn').addEventListener('click', handleDrugAction);
 
   $('#saveDispositionBtn').addEventListener('click', () => {
@@ -274,6 +335,8 @@ function initActions() {
     $('#dispositionResultBox').textContent = currentCase.disposition || '';
     $('#diagnosisInput').value = '';
     $('#diagnosisResultBox').textContent = '';
+    resetSelectionState();
+    resetRequestQueue();
     syncScoreToSession();
   });
 }
@@ -349,6 +412,13 @@ async function handleFlowSubmit(step) {
   renderFlowHistory();
   updateFlowPlaceholder(step, choice);
 
+  if (['anamnez', 'muayene'].includes(step)) {
+    recordAnamnezMuayene(step, choice);
+    if (step === 'muayene') {
+      showExamAlert(choice);
+    }
+  }
+
   if (sessionId) {
     await pushSelection(sessionId, entry);
   }
@@ -423,6 +493,14 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox) {
     result: resultText,
     scoreDelta
   });
+  if (['labs', 'imaging'].includes(fieldName)) {
+    enqueueRequest(fieldName, key);
+    recordRequestAndResult(fieldName, key, resultText);
+    showRequestModal(fieldName, key, resultText);
+  } else if (fieldName === 'procedures') {
+    enqueueRequest(fieldName, key);
+    recordRequestAndResult(fieldName, key, resultText);
+  }
   syncScoreToSession();
 }
 
@@ -617,6 +695,7 @@ function updateHostStatus(snapshot) {
   if (snapshot.activeCaseId) parts.push(`Aktif vaka: ${snapshot.activeCaseId}`);
   if (snapshot.timerRunning) parts.push('Süre çalışıyor');
   updateSessionStatus(parts.join(' | '));
+  updateCaseStatusBadge(snapshot);
   updateRemainingTime();
 }
 
@@ -704,7 +783,7 @@ function startTimerTicker() {
 }
 
 function updateRemainingTime() {
-  const targets = ['#remainingTime', '#remainingTimeFlow']
+  const targets = ['#remainingTime', '#remainingTimeFlow', '#remainingTimeTop']
     .map(sel => $(sel))
     .filter(Boolean);
   if (!targets.length) return;
@@ -720,4 +799,317 @@ function updateRemainingTime() {
   const minutes = String(Math.floor(remaining / 60000)).padStart(2, '0');
   const seconds = String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0');
   targets.forEach(el => (el.textContent = `${minutes}:${seconds}`));
+}
+
+function updateCaseStatusBadge(snapshot) {
+  const badge = $('#caseStatusBadge');
+  if (!badge) return;
+  const status = snapshot?.status || 'beklemede';
+  const active = snapshot?.activeCaseId ? ` · ${snapshot.activeCaseId}` : '';
+  badge.textContent = `${status}${active}`;
+  const live = ['active', 'running', 'started'].includes(status);
+  badge.classList.toggle('status-live', live);
+}
+
+function initMicroInteractions() {
+  $all('[data-trigger-alert]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const message = btn.dataset.triggerAlert || 'Bilgilendirme gönderildi.';
+      alert(message);
+    });
+  });
+
+  const overlay = $('#modalOverlay');
+  const defaultModal = overlay?.querySelector('.modal-card');
+  const closeModal = () => {
+    if (overlay) overlay.classList.remove('open');
+  };
+  const openModal = target => {
+    if (!overlay) return;
+    const modal = typeof target === 'string' ? document.querySelector(target) : target || defaultModal;
+    if (!modal) return;
+    overlay.classList.add('open');
+    modal.focus?.();
+  };
+
+  $all('[data-open-modal]').forEach(btn => {
+    btn.addEventListener('click', evt => {
+      evt.preventDefault();
+      openModal(btn.dataset.openModal);
+    });
+  });
+
+  $all('[data-close-modal]').forEach(btn => btn.addEventListener('click', closeModal));
+
+  if (overlay) {
+    overlay.addEventListener('click', evt => {
+      if (evt.target === overlay) closeModal();
+    });
+  }
+
+  document.addEventListener('keydown', evt => {
+    if (evt.key === 'Escape') closeModal();
+  });
+}
+
+function recordAnamnezMuayene(step, choice) {
+  const entry = {
+    id: uuid(),
+    step,
+    choice,
+    createdAt: Date.now()
+  };
+  selectionState.anamnezMuayene = [entry, ...selectionState.anamnezMuayene].slice(0, 30);
+  renderSelectionLists();
+}
+
+function recordRequestAndResult(section, key, result) {
+  const base = { id: uuid(), section, key, createdAt: Date.now() };
+  selectionState.istekler = [base, ...selectionState.istekler].slice(0, 30);
+  selectionState.sonuclar = [{ ...base, result }, ...selectionState.sonuclar].slice(0, 30);
+  renderSelectionLists({ animateResults: true });
+}
+
+function enqueueRequest(section, key) {
+  const entry = {
+    id: uuid(),
+    section,
+    key,
+    requestedAt: Date.now(),
+    waitedMinutes: 0,
+    targetWait: WAIT_TIME_BY_SECTION[section] || 15
+  };
+  requestQueue.unshift(entry);
+  renderRequestQueue();
+}
+
+function resetSelectionState() {
+  selectionState.anamnezMuayene = [];
+  selectionState.istekler = [];
+  selectionState.sonuclar = [];
+  animatedResultIds.clear();
+  renderSelectionLists();
+}
+
+function resetRequestQueue() {
+  requestQueue.length = 0;
+  simulatedMinutes = 0;
+  renderRequestQueue();
+  updateCaseStatusLocal('stabil');
+}
+
+function formatTimestamp(value) {
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildListTemplate(items, renderItem, emptyText = 'Henüz kayıt yok.') {
+  if (!items.length) return `<li class="muted">${escapeHtml(emptyText)}</li>`;
+  return items.map(renderItem).join('');
+}
+
+function renderSelectionLists(options = {}) {
+  const { animateResults = false } = options;
+  const anamnezList = $('#anamnezMuayeneList');
+  const istekList = $('#istekList');
+  const sonucList = $('#sonucList');
+  if (!anamnezList || !istekList || !sonucList) return;
+
+  anamnezList.innerHTML = buildListTemplate(
+    selectionState.anamnezMuayene,
+    item =>
+      `<li><div class="pill-text"><span>${escapeHtml(item.step)}: ${escapeHtml(
+        item.choice
+      )}</span></div><span class="pill-meta">${formatTimestamp(item.createdAt)}</span></li>`,
+    'Henüz kayıt yok.'
+  );
+
+  istekList.innerHTML = buildListTemplate(
+    selectionState.istekler,
+    item =>
+      `<li><span>${escapeHtml(formatSection(item.section))} · ${escapeHtml(
+        item.key
+      )}</span><span class="pill-meta">${formatTimestamp(item.createdAt)}</span></li>`,
+    'Henüz kayıt yok.'
+  );
+
+  renderResultsList(selectionState.sonuclar, sonucList, { animateResults });
+}
+
+function renderResultsList(items, listEl, { animateResults }) {
+  listEl.innerHTML = buildListTemplate(
+    items,
+    item => {
+      const summary = item.result || 'Sonuç kaydedildi.';
+      return `<li data-entry-id="${item.id}"><div class="pill-text"><span>${escapeHtml(
+        formatSection(item.section)
+      )} · ${escapeHtml(item.key || '')}</span><span class="pill-meta" data-result-text data-full="${escapeHtml(
+        summary
+      )}">${escapeHtml(summary)}</span></div><span class="pill-meta">${formatTimestamp(
+        item.createdAt
+      )}</span></li>`;
+    },
+    'Henüz sonuç yok.'
+  );
+
+  if (animateResults) {
+    animateResultText(listEl);
+  } else {
+    listEl.querySelectorAll('[data-entry-id]').forEach(item => animatedResultIds.add(item.dataset.entryId));
+  }
+}
+
+async function animateResultText(listEl) {
+  const fastShow = $('#fastShowToggle')?.checked;
+  const entries = Array.from(listEl.querySelectorAll('[data-entry-id]'));
+  for (const entry of entries) {
+    const id = entry.dataset.entryId;
+    const textEl = entry.querySelector('[data-result-text]');
+    if (!id || !textEl) continue;
+    const fullText = textEl.dataset.full || textEl.textContent || '';
+    if (fastShow) {
+      animatedResultIds.add(id);
+      textEl.textContent = fullText;
+      continue;
+    }
+    if (animatedResultIds.has(id)) continue;
+    animatedResultIds.add(id);
+    textEl.textContent = '';
+    for (const ch of fullText) {
+      textEl.textContent += ch;
+      await sleep(18);
+    }
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function renderRequestQueue() {
+  const list = $('#requestQueueList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!requestQueue.length) {
+    list.appendChild(createEl('li', { text: 'Kuyrukta istek yok.' }));
+    return;
+  }
+  requestQueue
+    .slice(0, 20)
+    .forEach(item => {
+      const meta = createEl('span', { text: `${item.waitedMinutes} dk`, className: 'pill-meta' });
+      const label = createEl('span', {
+        text: `${formatSection(item.section)} · ${item.key}`
+      });
+      const li = createEl('li');
+      li.appendChild(label);
+      li.appendChild(meta);
+      list.appendChild(li);
+    });
+}
+
+function showExamAlert(choice) {
+  const message = `Muayene seçimin kaydedildi: ${choice}`;
+  alert(message);
+}
+
+function showRequestModal(section, key, resultText) {
+  const title = `${formatSection(section)} isteği`;
+  const overlay = $('#studentModalOverlay');
+  const body = $('#studentModalBody');
+  if (!overlay || !body) return;
+  $('#studentModalTitle').textContent = title;
+  body.innerHTML = `<p><strong>${key}</strong> için yanıt:</p><p>${resultText}</p>`;
+  openStudentModal();
+}
+
+function handleShowResults() {
+  const increment = 15;
+  simulatedMinutes += increment;
+  requestQueue.forEach(item => {
+    item.waitedMinutes += increment;
+  });
+  renderRequestQueue();
+
+  const scenarioResult = evaluateScenarioRules();
+  updateCaseStatusLocal(scenarioResult.status);
+
+  if (scenarioResult.messages.length) {
+    scenarioResult.messages.forEach(msg => {
+      const entry = {
+        id: uuid(),
+        section: 'scenario',
+        key: `Simülasyon ${simulatedMinutes} dk`,
+        createdAt: Date.now(),
+        result: msg
+      };
+      selectionState.sonuclar = [entry, ...selectionState.sonuclar].slice(0, 30);
+    });
+    renderSelectionLists({ animateResults: true });
+  }
+
+  const feedback = scenarioResult.messages.length
+    ? scenarioResult.messages.join(' ')
+    : 'Vaka stabil seyrediyor.';
+  alert(`Geçen süre +${increment} dk. ${feedback}`);
+}
+
+function evaluateScenarioRules() {
+  const triggered = SCENARIO_RULES.filter(rule => rule.predicate());
+  const status = triggered.find(rule => rule.status === 'kötüleşti') ? 'kötüleşti' : 'stabil';
+  return {
+    status,
+    messages: triggered.map(rule => rule.message)
+  };
+}
+
+function updateCaseStatusLocal(status) {
+  const badge = $('#caseStatusLocal');
+  if (!badge) return;
+  const normalized = status === 'kötüleşti' ? 'kötüleşti' : 'stabil';
+  badge.textContent = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  badge.classList.toggle('status-live', normalized === 'kötüleşti');
+}
+
+function initStudentModal() {
+  const overlay = $('#studentModalOverlay');
+  if (!overlay) return;
+  overlay.addEventListener('click', evt => {
+    if (evt.target === overlay) closeStudentModal();
+  });
+  overlay.querySelectorAll('[data-close-student-modal]').forEach(btn => {
+    btn.addEventListener('click', closeStudentModal);
+  });
+}
+
+function openStudentModal() {
+  const overlay = $('#studentModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+}
+
+function closeStudentModal() {
+  const overlay = $('#studentModalOverlay');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+function formatSection(section) {
+  if (section === 'labs') return 'Laboratuvar';
+  if (section === 'imaging') return 'Görüntüleme';
+  if (section === 'muayene') return 'Muayene';
+  if (section === 'procedures') return 'Prosedür';
+  if (section === 'scenario') return 'Senaryo';
+  return section;
 }
