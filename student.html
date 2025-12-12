@@ -4,9 +4,17 @@
   <meta charset="UTF-8" />
   <title>Öğrenci Simülasyon Sayfası</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=1.0.1" />
 </head>
 <body class="mobile-shell">
+  <div id="sessionGate" class="session-gate" hidden>
+    <div class="session-gate-card">
+      <p class="eyebrow mini">Oturum Bekleniyor</p>
+      <h3 class="title-compact">Host vakayı başlattığında ekran açılacak</h3>
+      <p id="sessionGateText" class="muted mini">Host’un başlatmasını bekleyin.</p>
+      <p class="pill-meta">Oturum: <span id="sessionGateId">-</span></p>
+    </div>
+  </div>
   <header class="mobile-actionbar" aria-label="Hızlı eylemler">
     <div class="actionbar-left">
       <div class="timer-chip" aria-live="polite">
@@ -14,6 +22,10 @@
         <span id="remainingTimeTop" class="chip-value">--:--</span>
       </div>
       <span id="caseStatusLocal" class="status-badge status-idle" aria-live="polite">Stabil</span>
+      <div class="stat-chip alias-chip">
+        <span class="chip-label">Rumuz</span>
+        <span id="userNameDisplay" class="chip-value">-</span>
+      </div>
     </div>
     <div class="actionbar-right">
       <div class="stat-chip">
@@ -34,9 +46,9 @@
     <section class="stage-grid" aria-label="Hasta sahnesi">
       <div class="action-rail rail-left" aria-label="Sol eylemler">
         <button class="rail-btn" data-quick-action="anamnez">Anamnez</button>
-        <button class="rail-btn" data-quick-action="muayene">Muayene</button>
         <button class="rail-btn" data-quick-action="hikaye">Hikaye</button>
-        <button class="rail-btn" data-quick-action="laboratuvar">Laboratuvar</button>
+        <button class="rail-btn" data-quick-action="muayene">Muayene</button>
+        <button class="rail-btn" data-quick-action="laboratuvar">Tetkik / Lab</button>
       </div>
 
       <div class="patient-stage mobile-card" aria-label="Ana vaka">
@@ -81,54 +93,6 @@
         <button class="rail-btn" data-quick-action="prosedur">Prosedür</button>
         <button class="rail-btn" data-quick-action="ilac">İlaç / Tedavi</button>
         <button class="rail-btn" data-quick-action="tani">Tanı</button>
-      </div>
-    </section>
-
-    <section class="mobile-card" aria-label="Adım seçimleri">
-      <div class="flow-head compact">
-        <div>
-          <p class="eyebrow">Akış</p>
-          <h2 class="title-compact">Adım Akışı</h2>
-          <p class="muted mini">Anamnez → Muayene → Tetkik → Tanı/Tedavi</p>
-        </div>
-        <div class="active-step" id="activeStepLabel">Aktif adım: Anamnez</div>
-      </div>
-      <div class="flow-stack">
-        <div class="flow-step mobile" data-flow-step="anamnez">
-          <div class="flow-step-title">Anamnez</div>
-          <input type="search" class="option-search" data-search-target="anamnezSelect" placeholder="Ara..." />
-          <select id="anamnezSelect"></select>
-          <button class="btn tiny" data-step-submit="anamnez">Kaydet</button>
-          <p id="anamnezHint" class="muted mini"></p>
-        </div>
-        <div class="flow-step mobile" data-flow-step="muayene">
-          <div class="flow-step-title">Muayene</div>
-          <input type="search" class="option-search" data-search-target="muayeneSelect" placeholder="Ara..." />
-          <select id="muayeneSelect"></select>
-          <button class="btn tiny" data-step-submit="muayene">Kaydet</button>
-          <p id="muayeneHint" class="muted mini"></p>
-        </div>
-        <div class="flow-step mobile" data-flow-step="tetkik">
-          <div class="flow-step-title">Tetkik</div>
-          <input type="search" class="option-search" data-search-target="tetkikSelect" placeholder="Ara..." />
-          <select id="tetkikSelect"></select>
-          <button class="btn tiny" data-step-submit="tetkik">Kaydet</button>
-          <p id="tetkikHint" class="muted mini"></p>
-        </div>
-        <div class="flow-step mobile" data-flow-step="tani">
-          <div class="flow-step-title">Tanı / Tedavi</div>
-          <input type="search" class="option-search" data-search-target="taniSelect" placeholder="Ara..." />
-          <select id="taniSelect"></select>
-          <button class="btn tiny" data-step-submit="tani">Kaydet</button>
-          <p id="taniHint" class="muted mini"></p>
-        </div>
-      </div>
-      <div class="flow-placeholder" aria-live="polite">
-        <div class="flow-placeholder-texts">
-          <p id="flowPlaceholderText">Adım seçimi bekleniyor.</p>
-          <p id="flowReportText" class="muted mini"></p>
-        </div>
-        <img id="flowPlaceholderImage" src="" alt="Akış görseli" />
       </div>
     </section>
 
@@ -177,7 +141,8 @@
 
         <section id="tab-diagnosis" class="tab-panel" aria-label="Final Tanı">
           <h2>Final Tanı</h2>
-          <input id="diagnosisInput" type="text" placeholder="Final tanıyı yaz..." />
+          <input id="diagnosisInput" type="text" placeholder="Final tanını yaz..." list="icd10List" />
+          <datalist id="icd10List"></datalist>
           <button id="submitDiagnosisBtn" class="btn primary tiny">Tamamla</button>
           <div class="result-box" id="diagnosisResultBox"></div>
         </section>
@@ -194,7 +159,10 @@
   </main>
 
   <footer class="app-footer mini">
-    <small>Bu simülasyon eğitim amaçlıdır, gerçek hasta yönetiminin yerini tutmaz.</small>
+    <div class="footer-row">
+      <small>Bu sim?lasyon e?itim ama?l?d?r, ger?ek hasta y?netiminin yerini tutmaz.</small>
+      <button id="changeAliasBtn" class="btn ghost tiny">Rumuz de?i?tir</button>
+    </div>
   </footer>
 
   <aside class="floating-requests" aria-label="İstek kuyruğu" hidden>

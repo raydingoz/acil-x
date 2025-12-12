@@ -7,6 +7,8 @@ import {
   onSnapshot,
   orderBy,
   query,
+  deleteDoc,
+  getDocs,
   serverTimestamp,
   setDoc,
   updateDoc
@@ -185,4 +187,30 @@ export function listenToSelections(sessionId, callback) {
     snap.forEach(docSnap => selections.push({ id: docSnap.id, ...docSnap.data() }));
     callback(selections);
   });
+}
+
+export async function deleteSession(sessionId) {
+  const db = requireFirestore('oturum silme');
+  if (!db || !sessionId) return false;
+  await deleteDoc(doc(db, 'sessions', sessionId));
+  return true;
+}
+
+export async function resetSessionData(sessionId) {
+  const db = requireFirestore('oturum sıfırlama');
+  if (!db || !sessionId) return false;
+  const sessionRef = doc(db, 'sessions', sessionId);
+
+  // participants alt koleksiyonunu temizle
+  const participantsRef = collection(sessionRef, 'participants');
+  const participantsSnap = await getDocs(participantsRef);
+  const deletions = participantsSnap.docs.map(d => deleteDoc(d.ref));
+
+  // selections alt koleksiyonunu isteğe bağlı temizle
+  const selectionsRef = collection(sessionRef, 'selections');
+  const selectionsSnap = await getDocs(selectionsRef);
+  deletions.push(...selectionsSnap.docs.map(d => deleteDoc(d.ref)));
+
+  await Promise.all(deletions);
+  return true;
 }

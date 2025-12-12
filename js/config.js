@@ -1,3 +1,4 @@
+export const CASE_FILES = ['data/case-1.json', 'data/case-2.json'];
 export const CASES_URL = 'data/cases.json';
 
 export const STORAGE_KEYS = {

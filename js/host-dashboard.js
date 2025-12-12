@@ -6,7 +6,8 @@ import {
   initFirestore,
   listenToParticipantScores,
   listenToSession,
-  updateSessionState
+  updateSessionState,
+  resetSessionData
 } from './firestoreService.js';
 
 const FLOW_TIMER_DURATION_MS = 3 * 60 * 1000;
@@ -21,6 +22,7 @@ let qrLoadPromise = null;
 let casesData = null;
 let firebaseReady = false;
 let firebaseError = '';
+let hostCurrentCaseId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   setupSessionForm();
@@ -86,7 +88,8 @@ function bindHostButtons() {
     endCaseBtn: 'endCase',
     nextCaseBtn: 'nextCase',
     startTimerBtn: 'startTimer',
-    stopTimerBtn: 'stopTimer'
+    stopTimerBtn: 'stopTimer',
+    resetSessionBtn: 'resetSession'
   };
 
   Object.entries(mapping).forEach(([id, action]) => {
@@ -170,11 +173,29 @@ async function handleHostAction(action) {
   const payload = { lastAction: action };
   if (action === 'startCase') {
     payload.status = 'running';
+    payload.activeCaseId =
+      hostCurrentCaseId || hostSnapshot?.activeCaseId || getFeaturedCaseId(casesData);
+    payload.timerRunning = true;
+    payload.timerStartedAt = Date.now();
+    payload.timerStoppedAt = null;
   } else if (action === 'endCase') {
     payload.status = 'completed';
+    payload.activeCaseId = hostSnapshot?.activeCaseId ?? hostCurrentCaseId ?? null;
+    payload.timerRunning = false;
+    payload.timerStartedAt = null;
+    payload.timerStoppedAt = Date.now();
   } else if (action === 'nextCase') {
+    const nextId = getNextCaseId(hostSnapshot?.activeCaseId || hostCurrentCaseId);
+    if (nextId) {
+      updateCaseSummary(nextId);
+      payload.activeCaseId = nextId;
+    } else {
+      payload.activeCaseId = null;
+    }
     payload.status = 'pending';
-    payload.activeCaseId = null;
+    payload.timerRunning = false;
+    payload.timerStartedAt = null;
+    payload.timerStoppedAt = null;
   } else if (action === 'startTimer') {
     payload.timerRunning = true;
     payload.timerStartedAt = Date.now();
@@ -182,6 +203,16 @@ async function handleHostAction(action) {
   } else if (action === 'stopTimer') {
     payload.timerRunning = false;
     payload.timerStoppedAt = Date.now();
+  } else if (action === 'resetSession') {
+    await resetSessionData(sessionId);
+    payload = {
+      status: 'pending',
+      activeCaseId: null,
+      timerRunning: false,
+      timerStartedAt: null,
+      timerStoppedAt: null,
+      lastAction: 'resetSession'
+    };
   }
 
   await updateSessionState(sessionId, payload);
@@ -192,6 +223,7 @@ function renderSessionStatus() {
   if (!statusEl) return;
   if (!hostSnapshot) {
     statusEl.textContent = 'Oturum kaydı bulunamadı';
+    renderScoreboard([]);
     return;
   }
 
@@ -312,6 +344,7 @@ function updateCaseSummary(caseId) {
   const found = findCaseById(casesData, caseId) || findCaseById(casesData, getFeaturedCaseId(casesData));
   if (!found) return;
 
+  hostCurrentCaseId = found.id;
   titleEl.textContent = `${found.id} – ${found.title}`;
 
   const metaParts = [];
@@ -328,4 +361,11 @@ function updateCaseSummary(caseId) {
   }
   metaEl.textContent = metaParts.join(' | ');
   blurbEl.textContent = found.paramedic || found.story || 'Kısa vaka özeti bekleniyor.';
+}
+
+function getNextCaseId(currentId) {
+  if (!casesData?.cases?.length) return null;
+  const idx = casesData.cases.findIndex(c => c.id === currentId);
+  const nextIdx = idx >= 0 && idx < casesData.cases.length - 1 ? idx + 1 : 0;
+  return casesData.cases[nextIdx]?.id ?? null;
 }

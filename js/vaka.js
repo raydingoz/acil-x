@@ -1,4 +1,4 @@
-import { $, $all, createEl, formatTime, uuid } from './ui.js';
+﻿import { $, $all, createEl, formatTime, uuid } from './ui.js';
 import {
   loadCasesData,
   getFeaturedCaseId,
@@ -8,7 +8,7 @@ import {
   queryLLM,
   loadFlowDefaults
 } from './data.js';
-import { ScoreManager } from './scoring.js';
+import { ScoreManager, evaluateCaseScore } from './scoring.js';
 import { FIREBASE_CONFIG, FIREBASE_CONFIG_ISSUES, FIREBASE_CONFIG_SOURCE, FIREBASE_DEBUG, STORAGE_KEYS } from './config.js';
 import {
   ensureSession,
@@ -26,6 +26,8 @@ let currentCase = null;
 let scoreManager = null;
 let user = null;
 let sessionId = null;
+let sessionFollowerId = null;
+let sessionLocked = false;
 let sessionUnsubscribe = null;
 let scoresUnsubscribe = null;
 let hostState = null;
@@ -35,12 +37,15 @@ let flowHistory = [];
 let timerInterval = null;
 let simulatedMinutes = 0;
 let activeFlowStep = 'anamnez';
+const isStudentPage = window.location.pathname.includes('student');
 const selectionState = {
   anamnezMuayene: [],
   istekler: [],
   sonuclar: []
 };
+const LIVE_STATUSES = ['running', 'active', 'started'];
 const requestQueue = [];
+const usedOptions = new Set();
 const searchFilters = [];
 const animatedResultIds = new Set();
 const noticeTimeouts = new WeakMap();
@@ -70,8 +75,342 @@ const setTextContent = (selector, text) => {
 const WAIT_TIME_BY_SECTION = {
   labs: 20,
   imaging: 30,
-  procedures: 10
+  procedures: 10,
+  anamnez: 5,
+  muayene: 5,
+  hikaye: 5
 };
+
+const STANDARD_OPTIONS = {
+  anamnez: [
+    "Şikayeti netleştir",
+    "OPQRST sorgula",
+    "Kırmızı bayrak taraması",
+    "Ağrı değerlendirmesi",
+    "İlaç listesini al",
+    "Alerji sorgula",
+    "Antikoagülan/antiagregan sorgula",
+    "Gebelik/LMP/emzirme sorgula",
+    "Özgeçmiş/soygeçmiş",
+    "Cerrahi öykü/implant/pacemaker",
+    "Enfeksiyon riskleri",
+    "Toksik maruziyet",
+    "Travma mekanizması",
+    "Kanama öyküsü",
+    "Nöro öykü",
+    "Kardiyak öykü",
+    "Pulmoner öykü",
+    "Renal/ürolojik öykü",
+    "GİS öykü",
+    "Psikiyatrik risk",
+    "Aşılama durumu",
+    "Sosyal öykü"
+  ],
+  hikaye: [
+    "Olay başlangıcı ve tetikleyici",
+    "Önceki benzer atak",
+    "Fonksiyonel durum",
+    "Son 4 hafta cerrahi/immobilizasyon",
+    "İş/ev içi maruziyet",
+    "Enfeksiyon odağı sorgula",
+    "Antibiyotik kullanımı",
+    "Kanama/antikoagülasyon yönetimi",
+    "Diyet/ilaç tetikleyici",
+    "Sıvı kaybı ve alımı",
+    "Ağrı karakteri",
+    "Nöro alarm bulguları",
+    "Obstetrik alarm bulguları",
+    "Pediatrik durum sorgusu",
+    "Özel durum modülü"
+  ],
+  muayene: [
+    "Primer değerlendirme ABC",
+    "Vital bulgular ve trend",
+    "GKS/AVPU + pupil",
+    "Genel görünüm",
+    "Hava yolu değerlendirmesi",
+    "Solunum muayenesi",
+    "Dolaşım muayenesi",
+    "Kardiyak muayene",
+    "Abdomen muayenesi",
+    "Nörolojik muayene",
+    "Cilt/yumuşak doku",
+    "Travma sekonder survey",
+    "DVT muayenesi",
+    "Dehidratasyon değerlendirmesi",
+    "Meninks irritasyon bulguları",
+    "Gebelikte obstetrik muayene"
+  ],
+  labs: [
+    "Tam Kan",
+    "Elektrolit Paneli",
+    "BUN/Kreatinin",
+    "Glukoz",
+    "Karaciğer Fonksiyon",
+    "CRP",
+    "Prokalsitonin",
+    "Laktat",
+    "Koagülasyon",
+    "D-dimer",
+    "Troponin",
+    "BNP/NT-proBNP",
+    "Kan Gazı",
+    "İdrar tahlili",
+    "İdrar kültürü",
+    "Gebelik testi",
+    "Hemokültür x2",
+    "Solunum viral panel",
+    "COVID/Influenza hızlı test",
+    "Monospot/EBV",
+    "Hepatit serolojileri",
+    "TSH/Serbest T4",
+    "HbA1c",
+    "Ketone",
+    "Osmolalite",
+    "Toksikoloji taraması",
+    "Parasetamol düzeyi",
+    "Salisilat düzeyi",
+    "Etanol düzeyi",
+    "Karboksihemoglobin/Methemoglobin",
+    "Kan grubu ve crossmatch",
+    "Fibrinojen",
+    "DIC paneli",
+    "CK",
+    "Magnezyum",
+    "Fosfor",
+    "Lipaz",
+    "Amilaz",
+    "Amonyak",
+    "İdrar sodyumu/FeNa",
+    "LP paketi"
+  ],
+  imaging: [
+    "12 derivasyon EKG",
+    "Akciğer grafisi",
+    "Direkt batın grafisi",
+    "POCUS FAST",
+    "POCUS RUSH",
+    "POCUS akciğer",
+    "POCUS DVT",
+    "Abdomen US",
+    "Renal US",
+    "Ekokardiyografi",
+    "Beyin BT",
+    "Beyin BT Anjiyo",
+    "Toraks BT",
+    "BT pulmoner anjiyo",
+    "Abdomen-pelvis BT kontrastsız",
+    "Abdomen-pelvis BT kontrastlı",
+    "Travma pan-CT",
+    "Aort BT anjiyo",
+    "Beyin MR",
+    "Difüzyon MR",
+    "Spinal MR",
+    "Alt ekstremite venöz Doppler",
+    "Skrotal Doppler US",
+    "Obstetrik US"
+  ],
+  procedures: [
+    "Monitorizasyon",
+    "İki geniş damar yolu",
+    "İntraosseöz erişim",
+    "Arteriyel kanül",
+    "Santral venöz kateter",
+    "Kan şekeri ölçümü",
+    "Oksijen",
+    "NIV",
+    "Nebül tedavi",
+    "Entübasyon hazırlığı",
+    "Endotrakeal entübasyon",
+    "Supraglottik airway",
+    "Cerrahi hava yolu",
+    "Sıvı resüsitasyonu",
+    "Vazopressör infüzyon",
+    "Kan/ürün transfüzyonu",
+    "Defibrilasyon",
+    "Senkronize kardiyoversiyon",
+    "Geçici pacing",
+    "Servikal immobilizasyon",
+    "Pelvik kemer",
+    "Turnike/hemosztaz",
+    "Yara irrigasyonu ve sütür",
+    "Apse drenajı",
+    "Torakostomi tüpü",
+    "İğne dekompresyon",
+    "Foley kateter",
+    "Nazogastrik sonda",
+    "Lomber ponksiyon",
+    "Prosedürel sedasyon"
+  ],
+  drugs: [
+    "Parasetamol",
+    "NSAİİ",
+    "Opioid analjezik",
+    "Topikal anestezik",
+    "Ondansetron",
+    "Metoklopramid",
+    "PPI",
+    "H2 bloker",
+    "Antasid",
+    "Antihistaminik",
+    "Kortikosteroid",
+    "Adrenalin",
+    "Nebül adrenalin",
+    "Salbutamol nebül",
+    "İpratropium nebül",
+    "Sistemik steroid",
+    "Aspirin",
+    "P2Y12 inhibitörü",
+    "Nitrogliserin",
+    "Heparin/LMWH",
+    "Beta bloker",
+    "Diüretik",
+    "Amiodaron",
+    "Lidokain",
+    "Adenozin",
+    "Magnezyum sülfat",
+    "Kalsiyum glukonat",
+    "Sodyum bikarbonat",
+    "Benzodiazepin",
+    "Antiepileptik yükleme",
+    "Empirik antibiyotik sepsis",
+    "Empirik antibiyotik pnömoni",
+    "Empirik antibiyotik menenjit",
+    "İnsülin",
+    "Dekstroz",
+    "Tiamin",
+    "Nalokson",
+    "N-asetilsistein",
+    "Aktif kömür",
+    "Sedatif",
+    "Antipsikotik"
+  ],
+  tani: [
+    "Ön tanı listesi oluştur",
+    "Hayatı tehdit edenleri dışla",
+    "Risk skoru uygula",
+    "Tedavi hedeflerini yaz",
+    "Konsültasyon planla",
+    "Yatış/yoğun bakım değerlendirmesi",
+    "Gözlem protokolü",
+    "Taburculuk kriterleri ve bilgilendirme",
+    "Yüksek riskli kararları gerekçelendir"
+  ]
+};
+
+const OPTION_CATEGORIES = {
+  labs: [
+    {
+      label: "Temel",
+      items: ["Tam Kan", "Elektrolit Paneli", "BUN/Kreatinin", "Glukoz", "Karaciğer Fonksiyon", "Kan Gazı"]
+    },
+    {
+      label: "Enfeksiyon/Sepsis",
+      items: ["CRP", "Prokalsitonin", "Laktat", "Hemokültür", "Solunum viral panel", "COVID/Influenza hızlı test"]
+    },
+    {
+      label: "Kardiyak",
+      items: ["Troponin", "BNP/NT-proBNP", "CK"]
+    },
+    {
+      label: "Koagülasyon",
+      items: ["Koagülasyon", "D-dimer", "Fibrinojen", "DIC paneli"]
+    },
+    {
+      label: "Endokrin/Metabolik",
+      items: ["TSH/Serbest T4", "HbA1c", "Ketone", "Osmolalite"]
+    },
+    {
+      label: "Toksikoloji",
+      items: ["Toksikoloji taraması", "Parasetamol düzeyi", "Salisilat düzeyi", "Etanol düzeyi", "Karboksihemoglobin/Methemoglobin"]
+    },
+    {
+      label: "Diğer",
+      items: ["Lipaz", "Amilaz", "Amonyak", "İdrar tahlili", "İdrar kültürü", "Gebelik testi", "Mg/P"]
+    }
+  ],
+  imaging: [
+    {
+      label: "Temel",
+      items: ["12 derivasyon EKG", "Akciğer grafisi", "Direkt batın grafisi"]
+    },
+    {
+      label: "POCUS",
+      items: ["POCUS FAST", "POCUS RUSH", "POCUS akciğer", "POCUS DVT", "Abdomen US", "Renal US", "Ekokardiyografi"]
+    },
+    {
+      label: "BT",
+      items: [
+        "Beyin BT",
+        "Beyin BT Anjiyo",
+        "Toraks BT",
+        "BT pulmoner anjiyo",
+        "Abdomen-pelvis BT kontrastsız",
+        "Abdomen-pelvis BT kontrastlı",
+        "Travma pan-CT",
+        "Aort BT anjiyo"
+      ]
+    },
+    {
+      label: "MR",
+      items: ["Beyin MR", "Difüzyon MR", "Spinal MR"]
+    },
+    {
+      label: "Diğer",
+      items: ["Alt ekstremite venöz Doppler", "Skrotal Doppler US", "Obstetrik US"]
+    }
+  ]
+};
+
+const USED_KEY_SEPARATOR = '::';
+
+function normalizeSectionKey(key) {
+  if (!key) return '';
+  const map = {
+    laboratuvar: 'labs',
+    labs: 'labs',
+    tetkik: 'labs',
+    goruntuleme: 'imaging',
+    imaging: 'imaging',
+    prosedur: 'procedures',
+    procedures: 'procedures',
+    ilac: 'drugs',
+    drugs: 'drugs',
+    tani: 'tani',
+    anamnez: 'anamnez',
+    muayene: 'muayene',
+    hikaye: 'hikaye'
+  };
+  return map[key] || key;
+}
+
+function markOptionUsed(section, key) {
+  if (!section || !key) return;
+  usedOptions.add(`${normalizeSectionKey(section)}${USED_KEY_SEPARATOR}${key}`);
+}
+
+function isOptionUsed(section, key) {
+  if (!section || !key) return false;
+  return usedOptions.has(`${normalizeSectionKey(section)}${USED_KEY_SEPARATOR}${key}`);
+}
+
+function truncateText(text = '', limit = 120) {
+  if ((text || '').length <= limit) return text || '';
+  return `${text.slice(0, limit)}...`;
+}
+
+const ICD10_SUGGESTIONS = [
+  { code: "I21.9", label: "Akut miyokard infarktüsü" },
+  { code: "I50.9", label: "Kalp yetmezliği" },
+  { code: "J18.9", label: "Pnömoni, tanımlanmamış" },
+  { code: "K52.9", label: "Gastroenterit, tanımlanmamış" },
+  { code: "A09", label: "Enfeksiyöz gastroenterit" },
+  { code: "N17.9", label: "Akut böbrek yetmezliği" },
+  { code: "E11.9", label: "Tip 2 DM, komplikasyonsuz" },
+  { code: "G40.9", label: "Epilepsi, tanımlanmamış" },
+  { code: "S06.0", label: "Sarsıntı" },
+  { code: "T81.4", label: "Enfeksiyon, prosedür sonrası" }
+];
 
 const SCENARIO_RULES = [
   {
@@ -112,9 +451,9 @@ const SCENARIO_RULES = [
 ];
 
 const QUICK_ACTIONS = {
-  anamnez: { label: 'Anamnez', selectId: 'anamnezSelect', submitStep: 'anamnez' },
-  muayene: { label: 'Muayene', selectId: 'muayeneSelect', submitStep: 'muayene' },
-  hikaye: { label: 'Hikaye', showTextId: 'storyPeek' },
+  anamnez: { label: 'Anamnez', submitStep: 'anamnez' },
+  muayene: { label: 'Muayene', submitStep: 'muayene' },
+  hikaye: { label: 'Hikaye', submitStep: 'hikaye' },
   laboratuvar: {
     label: 'Laboratuvar',
     selectId: 'labSelect',
@@ -154,14 +493,19 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   user = loadOrCreateUser();
   initUserUI();
+  const urlSession = getSessionIdFromUrl();
+  const savedSession = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+  sessionFollowerId = urlSession || (savedSession && savedSession !== 'demo-session' ? savedSession : null);
 
   flowDefaults = await loadFlowDefaults();
 
   casesData = await loadCasesData();
   const featuredId = getFeaturedCaseId(casesData);
   const lastCaseId = localStorage.getItem(STORAGE_KEYS.LAST_CASE_ID);
-  const startCaseId = lastCaseId || featuredId;
-  loadCaseById(startCaseId);
+  const startCaseId = sessionFollowerId ? null : lastCaseId || featuredId;
+  if (startCaseId) {
+    loadCaseById(startCaseId);
+  }
 
   initTabs();
   initActions();
@@ -175,11 +519,24 @@ async function init() {
   renderSelectionLists();
   renderRequestQueue();
   refreshSearchSources();
+  populateIcd10List();
+
+  if (sessionFollowerId) {
+    updateSessionGate(true, 'Host’un vakayı başlatması bekleniyor.');
+    connectToSession(sessionFollowerId);
+  }
 }
 
 function initUserUI() {
-  if (!user.name) {
-    showNotice('Simülasyona başlamadan önce bir rumuz belirlemelisin.', 'warning');
+  if (isStudentPage) {
+    const aliasFromUrl = getAliasFromUrl();
+    if (aliasFromUrl) {
+      user = updateUserName(aliasFromUrl);
+    }
+    ensureAliasExists();
+    attachAliasChangeHandler();
+  } else if (!user.name) {
+    showNotice('Simulasyona baslamadan once bir rumuz belirlemelisin.', 'warning');
     const entered = prompt('Rumuzunu yaz:')?.trim();
     if (entered) {
       user = updateUserName(entered);
@@ -187,7 +544,45 @@ function initUserUI() {
   }
 
   const nameDisplay = $('#userNameDisplay');
-  if (nameDisplay) nameDisplay.textContent = user.name || 'Katılımcı';
+  if (nameDisplay) nameDisplay.textContent = user?.name || 'Katilimci';
+}
+
+function getAliasFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const alias = (params.get('alias') || params.get('rumuz') || params.get('nick') || '').trim();
+  return alias || null;
+}
+
+function ensureAliasExists() {
+  const defaultNames = ['Kullanıcı', 'Kullanici', 'Katılımcı', 'Katilimci'];
+  if (user?.name && !defaultNames.includes(user.name)) {
+    renderAliasDisplay();
+    return;
+  }
+  showNotice('Simulasyona baslamadan once bir rumuz belirlemelisin.', 'warning');
+  promptAndSaveAlias();
+}
+
+function renderAliasDisplay() {
+  const nameDisplay = $('#userNameDisplay');
+  if (nameDisplay) nameDisplay.textContent = user?.name || 'Katilimci';
+}
+
+function promptAndSaveAlias(message = 'Rumuzunu yaz:') {
+  const entered = prompt(message, user?.name || '')?.trim();
+  if (entered) {
+    user = updateUserName(entered);
+    renderAliasDisplay();
+    showNotice('Rumuz kaydedildi.');
+  }
+}
+
+function attachAliasChangeHandler() {
+  renderAliasDisplay();
+  const btn = $('#changeAliasBtn');
+  if (btn) {
+    btn.addEventListener('click', () => promptAndSaveAlias('Yeni rumuzunu yaz:'));
+  }
 }
 
 function loadCaseById(caseId) {
@@ -283,21 +678,18 @@ function loadCaseById(caseId) {
 function setupKeyedSelect(selectEl, obj) {
   if (!selectEl) return;
   selectEl.innerHTML = '';
-  if (!obj) {
-    const opt = createEl('option', { text: 'Tanımlı seçenek yok', attrs: { value: '' } });
-    selectEl.appendChild(opt);
-    selectEl.disabled = true;
-    return;
-  }
-  const keys = Object.keys(obj).filter(k => k !== 'default');
-  if (!keys.length) {
-    const opt = createEl('option', { text: 'Tanımlı seçenek yok', attrs: { value: '' } });
-    selectEl.appendChild(opt);
-    selectEl.disabled = true;
-    return;
-  }
-  selectEl.disabled = false;
-  keys.forEach(k => {
+  const keys = Object.keys(obj || {}).filter(k => k !== 'default');
+  const fallbackSection = selectEl.id?.includes('lab')
+    ? 'labs'
+    : selectEl.id?.includes('imaging')
+      ? 'imaging'
+      : selectEl.id?.includes('procedure')
+        ? 'procedures'
+        : null;
+  const merged = [...new Set([...keys, ...getStandardOptions(fallbackSection)])].filter(Boolean);
+  const list = merged.length ? merged : ['Seçenek yok'];
+  selectEl.disabled = !merged.length;
+  list.forEach(k => {
     const opt = createEl('option', { text: k });
     opt.value = k;
     selectEl.appendChild(opt);
@@ -397,17 +789,59 @@ function getSelectedIndex(selectEl) {
   return Number.isNaN(index) ? null : index;
 }
 
+function getSessionIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('session');
+}
+
+function isCaseUnlocked() {
+  if (!sessionFollowerId) return true;
+  return Boolean(LIVE_STATUSES.includes(hostState?.status) && hostState?.activeCaseId);
+}
+
+function enforceCaseUnlock() {
+  const unlocked = isCaseUnlocked();
+  if (!unlocked) {
+    showNotice('Host vakayı başlatana kadar işlem yapamazsın.', 'warning');
+    updateSessionGate(true, 'Host’un başlatmasını bekleyin.');
+  }
+  return unlocked;
+}
+
+function updateSessionGate(locked, text) {
+  const gate = $('#sessionGate');
+  if (!gate) return;
+  sessionLocked = Boolean(locked);
+  gate.hidden = !locked;
+  document.body.classList.toggle('session-locked', locked);
+  const gateText = $('#sessionGateText');
+  if (gateText && text) gateText.textContent = text;
+  const gateId = $('#sessionGateId');
+  if (gateId && sessionFollowerId) gateId.textContent = sessionFollowerId;
+}
+
 function initTabs() {
   const buttons = $all('.tab-btn');
   const panels = $all('.tab-panel');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.tab;
-      buttons.forEach(b => b.classList.toggle('active', b === btn));
-      panels.forEach(p => {
-        p.classList.toggle('active', p.id === `tab-${tab}`);
-      });
+      activateTab(tab);
     });
+  });
+}
+
+function activateTab(tab) {
+  if (!tab) return;
+  const buttons = $all('.tab-btn');
+  const panels = $all('.tab-panel');
+  buttons.forEach(btn => {
+    const isActive = btn.dataset.tab === tab;
+    btn.classList.toggle('active', isActive);
+  });
+  panels.forEach(panel => {
+    const isActive = panel.id === `tab-${tab}`;
+    panel.classList.toggle('active', isActive);
   });
 }
 
@@ -536,48 +970,41 @@ function initQuickRails() {
 }
 
 function getQuickActionOptions(actionKey, action) {
-  if (action?.selectId) {
-    const select = $(`#${action.selectId}`);
-    if (select && select.options.length) {
-      return [...select.options].map(opt => ({ value: opt.value, label: opt.textContent }));
-    }
+  const normalized = normalizeSectionKey(actionKey || action?.submitStep);
+  const caseOpts = collectCaseSpecificOptions(normalized) || [];
+  const standard = getStandardOptions(normalized);
+  if (normalized === 'labs') {
+    const labKeys = Object.keys(currentCase?.labs || {}).filter(k => k !== 'default');
+    const merged = [...new Set([...labKeys, ...standard])];
+    const categories = buildOptionCategories('labs', labKeys, standard);
+    return { options: merged.map(key => ({ value: key, label: key })), categories };
   }
-  if (!currentCase) return [];
-
-  if (actionKey === 'laboratuvar') {
-    return Object.keys(currentCase.labs || {})
-      .filter(k => k !== 'default')
-      .map(key => ({ value: key, label: key }));
+  if (normalized === 'imaging') {
+    const keys = Object.keys(currentCase?.imaging || {}).filter(k => k !== 'default');
+    const merged = [...new Set([...keys, ...standard])];
+    const categories = buildOptionCategories('imaging', keys, standard);
+    return { options: merged.map(key => ({ value: key, label: key })), categories };
   }
-  if (actionKey === 'goruntuleme') {
-    return Object.keys(currentCase.imaging || {})
-      .filter(k => k !== 'default')
-      .map(key => ({ value: key, label: key }));
+  if (normalized === 'procedures') {
+    const keys = Object.keys(currentCase?.procedures || {}).filter(k => k !== 'default');
+    const merged = [...new Set([...keys, ...standard])];
+    return { options: merged.map(key => ({ value: key, label: key })) };
   }
-  if (actionKey === 'prosedur') {
-    return Object.keys(currentCase.procedures || {})
-      .filter(k => k !== 'default')
-      .map(key => ({ value: key, label: key }));
-  }
-  if (actionKey === 'ilac') {
-    return (currentCase.drugs || []).map((drug, idx) => ({
+  if (normalized === 'drugs') {
+    const drugs = currentCase?.drugs || [];
+    const caseDrugs = drugs.map((drug, idx) => ({
       value: String(idx),
       label: drug.name || `İlaç ${idx + 1}`
     }));
+    const merged = [...caseDrugs, ...standard.map((name, idx) => ({ value: `std-${idx}`, label: name }))];
+    return { options: merged };
   }
-
-  if (action?.selectId) {
-    // Son çare, ilgili select yoksa bile akış seçeneklerini topla
-    const flowOptions = flowDefaults?.flowOptions?.[action.submitStep] || [];
-    const caseOptions = collectCaseSpecificOptions(action.submitStep) || [];
-    const unique = [...new Set([...flowOptions, ...caseOptions])];
-    return unique.map(item => ({ value: item, label: item }));
-  }
-
-  return [];
+  const flowOptions = flowDefaults?.flowOptions?.[action?.submitStep || normalized] || [];
+  const merged = [...new Set([...flowOptions, ...caseOpts, ...standard])];
+  return { options: merged.map(item => ({ value: item, label: item })) };
 }
 
-function openOptionPickerModal({ title, description, options, onSelect }) {
+function openOptionPickerModal({ title, description, options, categories = null, multiSelect = false, onSelect }) {
   const overlay = $('#studentModalOverlay');
   const body = $('#studentModalBody');
   if (!overlay || !body) return;
@@ -594,6 +1021,9 @@ function openOptionPickerModal({ title, description, options, onSelect }) {
   const listEl = document.getElementById(optionListId);
   const searchEl = document.getElementById(searchId);
 
+  const flatOptions = options || [];
+  const grouped = categories || [{ label: null, items: flatOptions }];
+
   const renderList = items => {
     if (!listEl) return;
     listEl.innerHTML = '';
@@ -601,33 +1031,69 @@ function openOptionPickerModal({ title, description, options, onSelect }) {
       listEl.appendChild(createEl('div', { text: 'Seçenek bulunamadı.', className: 'muted' }));
       return;
     }
-    items.forEach(item => {
-      const btn = createEl('button', {
-        text: item.label,
-        className: 'btn block ghost',
-        attrs: { type: 'button', 'data-option-value': item.value }
+    items.forEach(group => {
+      if (group.label) {
+        const hdr = createEl('div', { text: group.label, className: 'pill-meta' });
+        listEl.appendChild(hdr);
+      }
+      group.items.forEach(item => {
+        if (multiSelect) {
+          const wrapper = createEl('label', { className: 'option-row' });
+          const cb = createEl('input', {
+            attrs: { type: 'checkbox', value: item.value, 'data-option-value': item.value }
+          });
+          const txt = createEl('span', { text: item.label });
+          wrapper.appendChild(cb);
+          wrapper.appendChild(txt);
+          listEl.appendChild(wrapper);
+        } else {
+          const btn = createEl('button', {
+            text: item.label,
+            className: 'btn block ghost',
+            attrs: { type: 'button', 'data-option-value': item.value }
+          });
+          listEl.appendChild(btn);
+        }
       });
-      listEl.appendChild(btn);
     });
   };
 
-  renderList(options);
+  renderList(grouped);
 
-  listEl?.addEventListener('click', evt => {
-    const btn = evt.target.closest('[data-option-value]');
-    if (!btn) return;
-    const value = btn.dataset.optionValue;
-    onSelect?.(value);
-    closeStudentModal();
-  });
+  if (multiSelect) {
+    setModalActions([
+      { text: 'Vazgeç', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } },
+      { text: 'Uygula', className: 'btn primary', attrs: { id: 'applyMultiOptions' } }
+    ]);
+    $('#applyMultiOptions')?.addEventListener('click', () => {
+      const selected = Array.from(listEl.querySelectorAll('input[type="checkbox"]:checked')).map(
+        el => el.dataset.optionValue || el.value
+      );
+      if (selected.length) onSelect?.(selected);
+      closeStudentModal();
+    });
+  } else {
+    listEl?.addEventListener('click', evt => {
+      const btn = evt.target.closest('[data-option-value]');
+      if (!btn) return;
+      const value = btn.dataset.optionValue;
+      onSelect?.(value);
+      closeStudentModal();
+    });
+    setModalActions([{ text: 'Kapat', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } }]);
+  }
 
   searchEl?.addEventListener('input', () => {
     const term = searchEl.value.toLowerCase();
-    const filtered = options.filter(opt => opt.label.toLowerCase().includes(term));
+    const filtered = grouped
+      .map(g => ({
+        label: g.label,
+        items: g.items.filter(opt => opt.label.toLowerCase().includes(term))
+      }))
+      .filter(g => g.items.length);
     renderList(filtered);
   });
 
-  setModalActions([{ text: 'Kapat', className: 'btn ghost', attrs: { 'data-close-student-modal': '' } }]);
   openStudentModal();
 }
 
@@ -661,6 +1127,7 @@ function openInputModal({ title, prompt, defaultValue = '', onConfirm }) {
 }
 
 function handleQuickRailAction(actionKey) {
+  if (!enforceCaseUnlock()) return;
   const action = QUICK_ACTIONS[actionKey];
   if (!action) return;
 
@@ -680,23 +1147,29 @@ function handleQuickRailAction(actionKey) {
     return;
   }
 
-  const options = getQuickActionOptions(actionKey, action);
+  const { options, categories } = getQuickActionOptions(actionKey, action);
   if (!options.length) {
     showNotice('Seçenek bulunamadı', 'warning');
     return;
   }
 
+  const multiSelect = ['laboratuvar', 'goruntuleme'].includes(actionKey);
   openOptionPickerModal({
     title: action.label,
     description: 'Butonu uygulamak için bir seçenek seç.',
     options,
+    categories,
+    multiSelect,
     onSelect: value => {
-      if (action.selectId) {
-        const select = $(`#${action.selectId}`);
-        if (select) select.value = value;
-      }
-      if (action.submitStep) handleFlowSubmit(action.submitStep);
-      if (typeof action.handler === 'function') action.handler(value);
+      const values = Array.isArray(value) ? value : [value];
+      values.forEach(val => {
+        if (action.selectId) {
+          const select = $(`#${action.selectId}`);
+          if (select) select.value = val;
+        }
+        if (action.submitStep) handleFlowSubmit(action.submitStep, val);
+        if (typeof action.handler === 'function') action.handler(val);
+      });
     }
   });
 }
@@ -732,13 +1205,14 @@ function renderFlowOptions() {
 
 function collectCaseSpecificOptions(step) {
   if (!currentCase) return [];
-  if (step === 'anamnez') return [currentCase.story || 'Anamnez kaydı'];
-  if (step === 'muayene') return [currentCase.exam?.vitals, currentCase.exam?.physical].filter(Boolean);
-  if (step === 'tetkik') {
-    const labs = Object.keys(currentCase.labs || {}).filter(k => k !== 'default');
-    const imaging = Object.keys(currentCase.imaging || {}).filter(k => k !== 'default');
-    return [...labs, ...imaging];
-  }
+  const normalized = normalizeSectionKey(step);
+  step = normalized;
+  if (step === 'anamnez' || step === 'hikaye') return [];
+  if (step === 'muayene') return [];
+  if (step === 'tetkik' || step === 'labs') return [];
+  if (step === 'imaging') return [];
+  if (step === 'procedures') return [];
+  if (step === 'drugs') return (currentCase.drugs || []).map(d => d.name).filter(Boolean);
   if (step === 'tani') {
     const drugs = (currentCase.drugs || []).map(d => d.name).filter(Boolean);
     return [currentCase.final_diagnosis, ...drugs].filter(Boolean);
@@ -746,13 +1220,17 @@ function collectCaseSpecificOptions(step) {
   return [];
 }
 
-async function handleFlowSubmit(step) {
+async function handleFlowSubmit(step, choiceOverride = null) {
+  if (!enforceCaseUnlock()) return;
   const select = $(`#${step}Select`);
-  if (!select) return;
-  const choice = select.value;
+  const choice = choiceOverride ?? select?.value;
   if (!choice) return;
 
   setActiveFlowStep(step);
+  const tabMap = { anamnez: 'story', hikaye: 'story', muayene: 'exam' };
+  if (tabMap[step]) {
+    activateTab(tabMap[step]);
+  }
 
   const entry = {
     id: uuid(),
@@ -768,11 +1246,16 @@ async function handleFlowSubmit(step) {
   renderFlowHistory();
   updateFlowPlaceholder(step, choice);
 
-  if (['anamnez', 'muayene'].includes(step)) {
+  if (['anamnez', 'muayene', 'hikaye'].includes(step)) {
     recordAnamnezMuayene(step, choice);
     if (step === 'muayene') {
       showExamAlert(choice);
     }
+  }
+
+  const flowResult = getFlowResult(step, choice);
+  if (flowResult && !['anamnez', 'muayene', 'hikaye'].includes(step)) {
+    appendResultToDetails(step, choice, flowResult);
   }
 
   if (sessionId) {
@@ -824,6 +1307,7 @@ function setActiveFlowStep(step) {
   if (!label) return;
   const titles = {
     anamnez: 'Anamnez',
+    hikaye: 'Hikaye',
     muayene: 'Muayene',
     tetkik: 'Tetkik',
     tani: 'Tanı/Tedavi'
@@ -833,17 +1317,19 @@ function setActiveFlowStep(step) {
 
 function handleQuickApply() {
   if (!activeFlowStep) return;
-  handleFlowSubmit(activeFlowStep);
+  // Quick apply now opens the related quick action picker
+  const actionKey = activeFlowStep === 'tetkik' ? 'laboratuvar' : activeFlowStep;
+  handleQuickRailAction(actionKey);
 }
 
 async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox, keyOverride) {
+  if (!enforceCaseUnlock()) return;
   if (!currentCase || !scoreManager) return;
   const key = keyOverride || selectEl?.value || promptForKey(fieldName);
   if (!key) return;
 
-  const source = currentCase[fieldName] || {};
-  const staticResult = source[key] ?? source.default ?? 'Bu işlem için tanımlı yanıt yok.';
-  const isUnnecessary = source[key] == null;
+  const staticResult = getActionResult(fieldName, key);
+  const isUnnecessary = !currentCase[fieldName] || currentCase[fieldName][key] == null;
 
   // İlk LLM'ye sor, yoksa statik
   const llmAnswer = await queryLLM({
@@ -856,7 +1342,6 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox, keyO
   });
 
   const resultText = llmAnswer || staticResult;
-  if (resultBox) resultBox.textContent = resultText;
 
   const scoreDelta = scoreManager.applyPenalty(scoreType, { unnecessary: isUnnecessary });
   updateScoreUI();
@@ -864,28 +1349,77 @@ async function handleKeyedAction(fieldName, scoreType, selectEl, resultBox, keyO
     section: fieldName,
     actionType: scoreType,
     key,
-    result: resultText,
+    result: 'İstek kuyruğuna eklendi.',
     scoreDelta
   });
-  if (['labs', 'imaging'].includes(fieldName)) {
-    enqueueRequest(fieldName, key);
-    recordRequestAndResult(fieldName, key, resultText);
-    showRequestModal(fieldName, key, resultText);
-  } else if (fieldName === 'procedures') {
-    enqueueRequest(fieldName, key);
-    recordRequestAndResult(fieldName, key, resultText);
+  if (['labs', 'imaging', 'procedures'].includes(fieldName)) {
+    enqueueRequest(fieldName, key, resultText);
+  } else {
+    if (resultBox) resultBox.textContent = resultText;
   }
   syncScoreToSession();
 }
 
-async function handleDrugAction() {
+async function handleDrugAction(keyOverride = null) {
+  if (!enforceCaseUnlock()) return;
   if (!currentCase || !scoreManager) return;
   const drugs = currentCase.drugs || [];
-  const drugIdx = getSelectedIndex($('#drugSelect')) ?? promptForDrug(drugs);
-  const doseIdx = getSelectedIndex($('#doseSelect')) ?? promptForDose(drugs[drugIdx]);
-  const drug = drugs[drugIdx];
+  let drug = null;
+  let doseText = '';
+
+  const resolveFromValue = value => {
+    if (value == null) return null;
+    const strVal = String(value);
+    if (strVal.startsWith('std-')) {
+      const idx = parseInt(strVal.split('-').pop(), 10);
+      const name = STANDARD_OPTIONS.drugs?.[idx] || 'İlaç';
+      return {
+        drug: { name, doses: ['Standart doz'], response: 'Tedavi uygulandı.' },
+        doseIdx: 0
+      };
+    }
+    const num = parseInt(strVal, 10);
+    if (!Number.isNaN(num) && drugs[num]) return { drug: drugs[num], doseIdx: 0 };
+    const byName = drugs.find(d => (d.name || '').toLowerCase() === strVal.toLowerCase());
+    if (byName) return { drug: byName, doseIdx: 0 };
+    // Standart havuzdan serbest isim
+    return {
+      drug: { name: strVal || 'İlaç', doses: ['Standart doz'], response: 'Tedavi uygulandı.' },
+      doseIdx: 0
+    };
+  };
+
+  if (keyOverride != null) {
+    const found = resolveFromValue(keyOverride);
+    drug = found?.drug;
+    doseText = found?.drug?.doses?.[found.doseIdx] || '';
+  } else {
+    const drugIdx = getSelectedIndex($('#drugSelect'));
+    if (drugIdx != null && drugs[drugIdx]) {
+      drug = drugs[drugIdx];
+      const doseIdx = getSelectedIndex($('#doseSelect')) ?? 0;
+      doseText = drug.doses?.[doseIdx] ?? '';
+      if (!doseText && Array.isArray(drug.doses) && drug.doses.length > 1) {
+        const doseOptions = drug.doses.map((d, i) => ({ value: String(i), label: d }));
+        openOptionPickerModal({
+          title: 'Doz seç',
+          options: doseOptions,
+          onSelect: val => {
+            const idx = parseInt(val, 10);
+            const dt = drug.doses?.[idx] ?? '';
+            handleDrugActionWithSelection(drug, dt);
+          }
+        });
+        return;
+      }
+    }
+  }
+
   if (!drug) return;
-  const doseText = drug.doses?.[doseIdx] ?? '';
+  handleDrugActionWithSelection(drug, doseText);
+}
+
+async function handleDrugActionWithSelection(drug, doseText) {
   const staticResult = drug.response || 'Tedavi uygulandı.';
 
   const llmAnswer = await queryLLM({
@@ -899,8 +1433,10 @@ async function handleDrugAction() {
   });
 
   const resultText = llmAnswer || staticResult;
-  const drugResult = $('#drugResultBox');
-  if (drugResult) drugResult.textContent = `${drug.name} (${doseText}): ${resultText}`;
+  const label = doseText ? `${drug.name} (${doseText})` : drug.name;
+  const uniqueKey = `${label} ${formatTime(new Date())}`;
+  appendResultToDetails('drugs', uniqueKey, resultText);
+  recordRequestAndResult('drugs', uniqueKey, resultText);
 
   // İlaç için şimdilik skor cezası uygulamıyoruz, istersen type ekleyebilirsin
   appendLog({
@@ -913,36 +1449,63 @@ async function handleDrugAction() {
 }
 
 async function handleDiagnosisSubmit() {
+  if (!enforceCaseUnlock()) return;
   if (!currentCase || !scoreManager) return;
   const inputDx = $('#diagnosisInput').value.trim();
   if (!inputDx) return;
 
   const correctDx = (currentCase.final_diagnosis || '').trim();
-  const isCorrect =
-    inputDx.localeCompare(correctDx, 'tr-TR', { sensitivity: 'base' }) === 0;
-
-  const { diagnosisDelta, speedDelta, total } = scoreManager.applyDiagnosis(isCorrect);
+  const evaluation = evaluateCaseScore({
+    scoringConfig: currentCase.scoring,
+    selectionState,
+    flowHistory,
+    diagnosisInput: inputDx,
+    expectedDiagnosis: correctDx,
+    elapsedMs: scoreManager.getElapsedMs()
+  });
+  scoreManager.applyFinalEvaluation(evaluation);
   updateScoreUI();
 
-  let msg;
-  if (isCorrect) {
-    msg = `Doğru: ${correctDx}. Tanı bonusu +${diagnosisDelta} puan.`;
-  } else {
-    msg = `Beklenen tanı: ${correctDx}. Girilen: ${inputDx}.`;
-  }
-  if (speedDelta) {
-    msg += ` Hız bonusu: +${speedDelta}.`;
-  }
-  $('#diagnosisResultBox').textContent = msg;
+  const briefing = buildEvaluationBriefing(evaluation);
+  $('#diagnosisResultBox').innerHTML = briefing.html;
+  showNotice(briefing.notice, evaluation.diagnosis?.isCorrect ? 'success' : 'warning');
 
   appendLog({
     section: 'diagnosis',
     actionType: 'submit_diagnosis',
     key: null,
-    result: msg,
-    scoreDelta: total
+    result: briefing.notice,
+    scoreDelta: evaluation.total
   });
   syncScoreToSession();
+}
+
+function buildEvaluationBriefing(evaluation) {
+  if (!evaluation) {
+    return { html: 'Değerlendirme bulunamadı.', notice: 'Skor hesaplanamadı.' };
+  }
+  const categoryLabels = {
+    muayene: 'Muayene',
+    istek: 'İstek',
+    tedavi: 'Tedavi',
+    tani: 'Tanı'
+  };
+
+  const categoryParts = Object.entries(evaluation.categories || {}).map(([key, val]) => {
+    const label = categoryLabels[key] || key;
+    return `${label} ${val}/100`;
+  });
+
+  const findings = (evaluation.findings || []).map(item => {
+    const deltaTxt = item.delta > 0 ? `+${item.delta}` : `${item.delta}`;
+    const label = categoryLabels[item.category] || item.category;
+    return `<li>${label}: ${escapeHtml(item.reason)} (${deltaTxt})</li>`;
+  });
+
+  const notice = `Genel skor ${evaluation.total}/100 | ${categoryParts.join(' | ')}`;
+  const findingsHtml = findings.length ? `<ul>${findings.join('')}</ul>` : '<p>Ek not yok.</p>';
+  const html = `<strong>${notice}</strong><br/>${findingsHtml}`;
+  return { html, notice };
 }
 
 function updateScoreUI() {
@@ -1067,6 +1630,9 @@ function updateHostStatus(snapshot) {
   hostState = snapshot;
   if (!snapshot) {
     updateSessionStatus('Oturum kaydı bulunamadı.');
+    if (sessionFollowerId) {
+      updateSessionGate(true, 'Host bağlantısı bekleniyor.');
+    }
     return;
   }
   const parts = [`Durum: ${snapshot.status || 'bilinmiyor'}`];
@@ -1075,6 +1641,17 @@ function updateHostStatus(snapshot) {
   updateSessionStatus(parts.join(' | '));
   updateCaseStatusBadge(snapshot);
   updateRemainingTime();
+  if (sessionFollowerId) {
+    const isLive = LIVE_STATUSES.includes(snapshot.status);
+    const ready = isLive && snapshot.activeCaseId;
+    const completed = snapshot.status === 'completed';
+    const message = ready
+      ? 'Vaka açıldı, başlayabilirsin.'
+      : completed
+        ? 'Vaka tamamlandı.'
+        : 'Host vakayı başlatmadı.';
+    updateSessionGate(!ready, message);
+  }
   if (snapshot.activeCaseId && snapshot.activeCaseId !== currentCase?.id) {
     loadCaseById(snapshot.activeCaseId);
   }
@@ -1111,9 +1688,15 @@ async function handleHostAction(action) {
   if (action === 'startCase') {
     payload.status = 'running';
     payload.activeCaseId = currentCase?.id ?? null;
+    payload.timerRunning = true;
+    payload.timerStartedAt = Date.now();
+    payload.timerStoppedAt = null;
   } else if (action === 'endCase') {
     payload.status = 'completed';
     payload.activeCaseId = currentCase?.id ?? null;
+    payload.timerRunning = false;
+    payload.timerStartedAt = null;
+    payload.timerStoppedAt = Date.now();
   } else if (action === 'nextCase') {
     const nextCase = findNextCase();
     if (nextCase) {
@@ -1121,6 +1704,9 @@ async function handleHostAction(action) {
       payload.activeCaseId = nextCase.id;
     }
     payload.status = 'pending';
+    payload.timerRunning = false;
+    payload.timerStartedAt = null;
+    payload.timerStoppedAt = null;
   } else if (action === 'startTimer') {
     payload.timerRunning = true;
     payload.timerStartedAt = Date.now();
@@ -1242,26 +1828,184 @@ function recordAnamnezMuayene(step, choice) {
   };
   selectionState.anamnezMuayene = [entry, ...selectionState.anamnezMuayene].slice(0, 30);
   renderSelectionLists();
+
+  // Anamnez/hikaye/muayene seçimlerini Hasta Detayları alanına biriktir
+  if (step === 'muayene') {
+    const vitals = currentCase?.exam?.vitals;
+    const physical = currentCase?.exam?.physical;
+    const merged = [vitals, physical].filter(Boolean).join(' | ');
+    const note = `${choice}: ${merged || 'Muayene bulgusu kaydedildi.'}`;
+    appendResultToDetails('muayene', choice, note);
+  } else if (step === 'anamnez' || step === 'hikaye') {
+    const storyText = currentCase?.story || 'Anamnez/hikaye kaydı.';
+    const note = `${choice}: ${storyText}`;
+    appendResultToDetails(step, choice, note);
+  }
 }
 
 function recordRequestAndResult(section, key, result) {
   const base = { id: uuid(), section, key, createdAt: Date.now() };
-  selectionState.istekler = [base, ...selectionState.istekler].slice(0, 30);
   selectionState.sonuclar = [{ ...base, result }, ...selectionState.sonuclar].slice(0, 30);
   renderSelectionLists({ animateResults: true });
 }
 
-function enqueueRequest(section, key) {
+function resolveEntryResult(entry) {
+  if (!entry) return 'Sonuç hazır.';
+  if (entry.resultText) return entry.resultText;
+  const source = currentCase?.[entry.section] || {};
+  return source[entry.key] ?? source.default ?? 'Sonuç hazır.';
+}
+
+function appendResultToDetails(section, key, resultText) {
+  const map = {
+    labs: ['#tab-labs #labResultBox', '#labResultBox'],
+    imaging: ['#tab-imaging #imagingResultBox', '#imagingResultBox'],
+    procedures: ['#tab-procedures #procedureResultBox', '#procedureResultBox'],
+    drugs: ['#tab-drugs #drugResultBox', '#drugResultBox'],
+    anamnez: ['#tab-story #storyText', '#storyText'],
+    hikaye: ['#tab-story #storyText', '#storyText'],
+    muayene: ['#tab-exam #examPhysical', '#examPhysical']
+  };
+  const target = map[section];
+  if (!target) return;
+  const selectors = Array.isArray(target) ? target : [target];
+  const box = selectors.map(sel => $(sel)).find(Boolean);
+  if (!box) return;
+  const entryKey = `${section}::${key || ''}`;
+  box.classList.add('result-box');
+  const markup = `<strong>${escapeHtml(key || formatSection(section))}</strong> <span class="pill-meta">${formatTime(
+    Date.now()
+  )}</span><br/><span class="muted mini">${escapeHtml(resultText || 'Sonuç hazır.')}</span>`;
+  const existing = box.querySelector(`[data-entry-key="${entryKey}"]`);
+  if (existing) {
+    existing.innerHTML = markup;
+    return;
+  }
+  const row = createEl('div', {
+    className: 'result-entry',
+    attrs: { 'data-entry-key': entryKey },
+    html: markup
+  });
+  box.appendChild(row);
+}
+
+function getFlowResult(step, choice) {
+  if (step === 'anamnez' || step === 'hikaye') {
+    return `${choice}: kayıt edildi.`;
+  }
+  if (step === 'muayene') {
+    return `${choice}: muayene kaydı.`;
+  }
+  return choice;
+}
+
+function getStandardOptions(section) {
+  const normalized = normalizeSectionKey(section);
+  return STANDARD_OPTIONS[normalized] || [];
+}
+
+function buildOptionCategories(section, caseKeys = [], standardList = []) {
+  const preset = OPTION_CATEGORIES[section] || [];
+  const categories = preset.map(group => ({
+    label: group.label,
+    items: (group.items || [])
+      .filter(Boolean)
+      .map(val => ({ value: val, label: val }))
+  }));
+  const extras = (caseKeys || []).filter(k => !standardList.includes(k));
+  if (extras.length) {
+    categories.unshift({
+      label: 'Vaka özel',
+      items: extras.map(val => ({ value: val, label: val }))
+    });
+  }
+  return categories.filter(cat => cat.items.length);
+}
+
+function randomInRange(min, max, digits = 1) {
+  const val = min + Math.random() * (max - min);
+  return Number(val.toFixed(digits));
+}
+
+function generateLabResult(key) {
+  const normalized = (key || '').toLowerCase();
+  if (normalized.includes('tam kan') || normalized.includes('hemogram')) {
+    return `Hb ${randomInRange(12.5, 15, 1)} g/dL, WBC ${randomInRange(4.5, 10.5, 1)}k, PLT ${Math.round(
+      randomInRange(170, 340, 0)
+    )}k`;
+  }
+  if (normalized.includes('elektrolit') || normalized.includes('bmp')) {
+    return `Na ${randomInRange(136, 144, 0)} mEq/L, K ${randomInRange(3.5, 4.9, 1)} mEq/L, Kreatinin ${randomInRange(
+      0.7,
+      1.1,
+      1
+    )} mg/dL`;
+  }
+  if (normalized.includes('pt') || normalized.includes('inr')) {
+    return `PT 12 sn, INR ${randomInRange(0.9, 1.1, 2)}`;
+  }
+  if (normalized.includes('troponin')) {
+    return `Troponin I ${randomInRange(0.0, 0.04, 2)} ng/mL (normal)`;
+  }
+  if (normalized.includes('crp')) {
+    return `CRP ${randomInRange(0.1, 0.5, 1)} mg/dL (normal)`;
+  }
+  if (normalized.includes('gaz')) {
+    return `pH ${randomInRange(7.37, 7.43, 2)}, PaCO2 ${randomInRange(36, 44, 0)} mmHg, HCO3 ${randomInRange(
+      22,
+      26,
+      0
+    )} mEq/L`;
+  }
+  return 'Değerler normal sınırlarda.';
+}
+
+function generateDefaultResult(section, key) {
+  if (section === 'labs') return generateLabResult(key);
+  if (section === 'imaging') return 'Görüntülemede akut patoloji saptanmadı.';
+  if (section === 'procedures') return 'İşlem komplikasyonsuz tamamlandı.';
+  if (section === 'anamnez' || section === 'hikaye') return `${key}: bilgi notu kaydedildi.`;
+  if (section === 'muayene') return `${key}: normal sınırlarda bulgular.`;
+  return 'İşlem kaydedildi.';
+}
+
+function getActionResult(section, key) {
+  const source = currentCase?.[section] || {};
+  const hasCaseValue = Object.prototype.hasOwnProperty.call(source, key);
+  const staticResult = hasCaseValue ? source[key] : source.default;
+  const lowered = (staticResult || '').toLowerCase();
+  const placeholderPhrases = ['kaydı yok', 'kayıt yok', 'kayit yok', 'sonuç yok', 'sonuc yok', 'kayıt bulunamadı'];
+  const placeholder = placeholderPhrases.some(phrase => lowered.includes(phrase));
+  if (staticResult && !placeholder) return staticResult;
+  return generateDefaultResult(section, key);
+}
+
+function populateIcd10List() {
+  const list = $('#icd10List');
+  if (!list) return;
+  list.innerHTML = '';
+  ICD10_SUGGESTIONS.forEach(item => {
+    const opt = createEl('option', { text: `${item.code} - ${item.label}` });
+    opt.value = `${item.code} - ${item.label}`;
+    list.appendChild(opt);
+  });
+}
+
+function enqueueRequest(section, key, resultText, targetWaitOverride) {
   const entry = {
     id: uuid(),
     section,
     key,
     requestedAt: Date.now(),
     waitedMinutes: 0,
-    targetWait: WAIT_TIME_BY_SECTION[section] || 15
+    targetWait: Math.max(targetWaitOverride ?? WAIT_TIME_BY_SECTION[section] ?? 15, 1),
+    resultText
   };
+  const requestRecord = { id: entry.id, section, key, createdAt: entry.requestedAt };
+  selectionState.istekler = [requestRecord, ...selectionState.istekler].slice(0, 30);
   requestQueue.unshift(entry);
   renderRequestQueue();
+  renderSelectionLists();
 }
 
 function resetSelectionState() {
@@ -1269,6 +2013,7 @@ function resetSelectionState() {
   selectionState.istekler = [];
   selectionState.sonuclar = [];
   animatedResultIds.clear();
+  usedOptions.clear();
   renderSelectionLists();
 }
 
@@ -1452,6 +2197,7 @@ function showRequestModal(section, key, resultText) {
 }
 
 function openDiagnosisModal() {
+  if (!enforceCaseUnlock()) return;
   const overlay = $('#studentModalOverlay');
   const body = $('#studentModalBody');
   if (!overlay || !body) return;
@@ -1508,10 +2254,13 @@ function finalizeDiagnosisSelection(choice) {
 }
 
 function handleShowResults() {
-  const increment = 15;
+  if (!enforceCaseUnlock()) return;
+  const remainingTimes = requestQueue.map(item => Math.max((item.targetWait || 0) - (item.waitedMinutes || 0), 0));
+  const maxRemaining = remainingTimes.length ? Math.max(...remainingTimes) : 0;
+  const increment = maxRemaining > 0 ? maxRemaining : 15;
   simulatedMinutes += increment;
   requestQueue.forEach(item => {
-    item.waitedMinutes += increment;
+    item.waitedMinutes = Math.min(item.targetWait, (item.waitedMinutes || 0) + increment);
   });
   updateVirtualTimeDisplay();
   renderRequestQueue();
@@ -1543,8 +2292,15 @@ function applyRequest(id) {
   const idx = requestQueue.findIndex(item => item.id === id);
   if (idx < 0) return;
   const entry = requestQueue[idx];
+  const remaining = Math.max((entry.targetWait || 0) - (entry.waitedMinutes || 0), 0);
+  if (remaining > 0) {
+    simulatedMinutes += remaining;
+    updateVirtualTimeDisplay();
+  }
   requestQueue.splice(idx, 1);
-  recordRequestAndResult(entry.section, entry.key, `${formatSection(entry.section)} tamamlandı.`);
+  const resultText = resolveEntryResult(entry);
+  recordRequestAndResult(entry.section, entry.key, resultText);
+  appendResultToDetails(entry.section, entry.key, resultText);
   renderRequestQueue();
 }
 
@@ -1680,3 +2436,9 @@ function formatSection(section) {
   if (section === 'scenario') return 'Senaryo';
   return section;
 }
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import { CASES_URL, STORAGE_KEYS, LLM_ENDPOINT } from './config.js';
+import { CASE_FILES, CASES_URL, STORAGE_KEYS, LLM_ENDPOINT } from './config.js';
 import { uuid } from './ui.js';
 
 let cachedCasesData = null;
@@ -20,9 +20,27 @@ export async function loadCasesData() {
 
   if (!cachedCasesData) {
     try {
-      const res = await fetch(CASES_URL);
-      if (!res.ok) throw new Error('Cases JSON yüklenemedi');
-      cachedCasesData = await res.json();
+      const sources = Array.isArray(CASE_FILES) && CASE_FILES.length ? CASE_FILES : [CASES_URL];
+      const payloads = await Promise.all(
+        sources.map(async url => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Cases JSON yüklenemedi: ${url}`);
+          return res.json();
+        })
+      );
+      const merged = { featured_case_id: null, cases: [] };
+      payloads.forEach(data => {
+        if (!data) return;
+        const cases = data.cases || (data.id ? [data] : []);
+        merged.cases.push(...cases);
+        if (!merged.featured_case_id) {
+          merged.featured_case_id = data.featured_case_id || cases[0]?.id || null;
+        }
+      });
+      if (!merged.featured_case_id && merged.cases[0]) {
+        merged.featured_case_id = merged.cases[0].id;
+      }
+      cachedCasesData = merged;
     } catch (e) {
       console.error('Vaka verisi yüklenemedi, fallback kullanılacak', e);
       cachedCasesData = fallbackCasesData();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Host / Yönetici Paneli</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=1.0.1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" defer></script>
 </head>
 <body class="host-page">
@@ -40,6 +40,9 @@
       <div class="action-row host-actions">
         <button id="startTimerBtn" class="btn small">Süreyi Başlat</button>
         <button id="stopTimerBtn" class="btn small">Süreyi Durdur</button>
+      </div>
+      <div class="action-row host-actions">
+        <button id="resetSessionBtn" class="btn outline small">Oturumu Sıfırla</button>
       </div>
 
       <p id="sessionStatus" class="muted">Firestore oturumu bağlı değil.</p>

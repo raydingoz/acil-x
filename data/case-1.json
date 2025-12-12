@@ -1,0 +1,152 @@
+{
+  "cases": [
+    {
+      "id": "case-001",
+      "title": "Akut İnme Şüphesi",
+      "difficulty": "orta",
+      "tags": [
+        "nöroloji",
+        "acil"
+      ],
+      "patient": {
+        "age": 68,
+        "sex": "K",
+        "setting": "acil",
+        "triage": "kırmızı"
+      },
+      "paramedic": "68 yaş kadın hasta, ani konuşma bozukluğu ve sağ hemiparezi ile 20 dakika önce görüldü. Kan şekeri normal, hava yolu güvenli, oksijen veriliyor.",
+      "story": "Hasta 30 dakikadır devam eden konuşma güçlüğü, sağ kolda güçsüzlük ve yüzde asimetri şikayetiyle başvurdu. Antikoagülan kullanımı yok, son bilinen normal zamanı 30 dakika önce.",
+      "exam": {
+        "vitals": "TA: 180/100 mmHg, Nabız: 92/dk, SpO2: %96 (oda havası), Solunum: 18/dk, Glisemi: 108 mg/dl",
+        "physical": "Bilinç açık, afazik. Sağda 2/5 motor güç, pupil izokorik, meningeal bulgu yok. NIHSS: 9."
+      },
+      "labs": {
+        "Tam Kan": "Hb 12.5 g/dL, WBC 9.8k, PLT 240k",
+        "Elektrolit Paneli": "Na 139 mEq/L, K 4.1 mEq/L, Kreatinin 0.9 mg/dL",
+        "Koagülasyon": "PT/INR: 1.0",
+        "Troponin": "Troponin I normal",
+        "default": "Laboratuvar sonucu bekleniyor."
+      },
+      "imaging": {
+        "Beyin BT": "Akut kanama saptanmadı, orta hat kayması yok, erken iskemik bulgu yok.",
+        "Beyin MR": "DWI: sol MCA bölgesinde kısıtlı difüzyon, MRA'da distal M2 segmentinde daralma.",
+        "Toraks BT": "Pulmoner emboli lehine bulgu yok, akciğer alanları temiz.",
+        "12 derivasyon EKG": "Sinüs ritmi, ST elevasyonu yok.",
+        "default": "Görüntüleme sonucu bekleniyor."
+      },
+      "procedures": {
+        "Oksijen": "2 L/dk oksijen ile SpO2 %98'e çıkar, solunum rahatlar.",
+        "İki geniş damar yolu": "18G damar yolu açıldı, sıvı desteği için hazır.",
+        "Kan basıncı kontrolü": "Labetalol bolus sonrası TA 150/90 mmHg'ye düşer, nörolojik tablo değişmez.",
+        "default": "Prosedür sonucu bekleniyor."
+      },
+      "media": {
+        "cover_image": "media/defaults/case-hero.jpg",
+        "ekg_image": "media/defaults/ekg-placeholder.png",
+        "imaging_gallery": [
+          "media/defaults/xray-placeholder.png"
+        ],
+        "audio_note": null
+      },
+      "drugs": [
+        {
+          "name": "Asetilsalisilik asit",
+          "doses": [
+            "300 mg çiğneme"
+          ],
+          "response": "Antiplatelet başlandı, semptom stabil seyretti."
+        },
+        {
+          "name": "Labetalol",
+          "doses": [
+            "10 mg IV bolus",
+            "Tekrar 10 mg bolus"
+          ],
+          "response": "Kan basıncında kontrollü düşüş, nörolojik durum stabil kalır."
+        }
+      ],
+      "consults": [
+        "Nöroloji",
+        "Radyoloji"
+      ],
+      "disposition": "İnme ünitesinde yatırılarak tromboliz için değerlendirme yapılmalı.",
+      "final_diagnosis": "Akut iskemik inme",
+      "scoring": {
+        "base": 100,
+        "penalty_per_lab": 5,
+        "penalty_per_imaging": 8,
+        "penalty_per_procedure": 10,
+        "penalty_wrong_dx": 25,
+        "bonus_correct_dx": 50,
+        "category_weights": {
+          "muayene": 0.35,
+          "istek": 0.25,
+          "tedavi": 0.2,
+          "tani": 0.2
+        },
+        "required": [
+          {
+            "type": "muayene",
+            "key": "Primer degerlendirme ABC",
+            "penalty_on_skip": 20
+          },
+          {
+            "type": "muayene",
+            "key": "GKS/AVPU + pupil",
+            "penalty_on_skip": 15
+          },
+          {
+            "type": "imaging",
+            "key": "Beyin BT",
+            "penalty_on_skip": 25
+          },
+          {
+            "type": "lab",
+            "key": "Koagülasyon",
+            "penalty_on_skip": 12
+          },
+          {
+            "type": "lab",
+            "key": "Tam Kan",
+            "penalty_on_skip": 8
+          }
+        ],
+        "bonus": [
+          {
+            "type": "procedure",
+            "key": "İki geniş damar yolu",
+            "bonus": 10
+          },
+          {
+            "type": "procedure",
+            "key": "Kan basıncı kontrolü",
+            "bonus": 15
+          },
+          {
+            "type": "drug",
+            "key": "Asetilsalisilik asit",
+            "bonus": 20
+          }
+        ],
+        "unnecessary": [
+          {
+            "type": "imaging",
+            "key": "toraks_bt",
+            "penalty": 15
+          }
+        ],
+        "caps": {
+          "overall_max": 100,
+          "overall_min": 0,
+          "category_max": {
+            "muayene": 100,
+            "istek": 100,
+            "tedavi": 100,
+            "tani": 100
+          }
+        }
+      }
+    }
+  ],
+  "featured_case_id": "case-001"
+}

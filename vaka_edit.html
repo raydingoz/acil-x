@@ -1,242 +1,408 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Vaka Editörü</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="css/styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedSim Vaka Editörü v2</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <style>
+        :root {
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --bg-body: #f3f4f6;
+    --bg-card: #ffffff;
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --danger: #ef4444;
+    --success: #10b981;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg-body); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+/* Layout */
+.app-container { display: flex; height: 100vh; }
+.sidebar { width: 280px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 1rem; z-index: 10; }
+.main-content { flex: 1; display: flex; flex-direction: column; background: var(--bg-body); overflow: hidden; }
+
+/* Sidebar */
+.brand { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; color: var(--primary); }
+.case-list-container { flex: 1; overflow-y: auto; margin: 1rem 0; }
+.case-list { list-style: none; padding: 0; margin: 0; }
+.case-list li { padding: 10px; border-radius: var(--radius); cursor: pointer; margin-bottom: 4px; font-size: 0.9rem; border: 1px solid transparent; }
+.case-list li:hover { background: var(--primary-light); }
+.case-list li.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+/* Header */
+.top-bar { background: var(--bg-card); padding: 1rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.case-meta { display: flex; align-items: center; gap: 1rem; width: 60%; }
+.badge { background: var(--text-main); color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-family: monospace; }
+.seamless-input { border: none; font-size: 1.2rem; font-weight: 600; width: 100%; outline: none; background: transparent; }
+
+/* Tabs */
+.tabs-nav { display: flex; gap: 2px; padding: 0 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab-btn { background: none; border: none; padding: 1rem; cursor: pointer; color: var(--text-muted); font-weight: 500; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; transition: all 0.2s; }
+.tab-btn:hover { color: var(--primary); background: var(--primary-light); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-pane { display: none; padding: 2rem; animation: fadeIn 0.3s; }
+.tab-pane.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.content-scroll-area { flex: 1; overflow-y: auto; padding-bottom: 4rem; }
+
+/* Cards & Forms */
+.card { background: var(--bg-card); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 1rem; }
+.card h3 { margin-top: 0; font-size: 1rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.form-group { margin-bottom: 1rem; }
+label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 0.4rem; color: var(--text-muted); }
+input, select, textarea { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: var(--radius); font-family: inherit; transition: border 0.2s; }
+input:focus, textarea:focus { border-color: var(--primary); outline: none; ring: 2px solid var(--primary-light); }
+
+/* Custom Elements */
+.vital-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; }
+.vital-item input { text-align: center; font-weight: bold; }
+
+.styled-list .kv-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center; background: var(--bg-body); padding: 0.5rem; border-radius: var(--radius); }
+.styled-list .kv-key { width: 30%; font-weight: 600; color: var(--primary); border: none; background: transparent; }
+.styled-list .kv-value { flex: 1; border: none; background: transparent; }
+
+.chip-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.chip { padding: 4px 10px; background: var(--primary-light); color: var(--primary); border: 1px solid transparent; border-radius: 20px; font-size: 0.8rem; cursor: pointer; transition: 0.2s; }
+.chip:hover { background: var(--primary); color: #fff; }
+
+.drug-row { background: #fff8f0; border: 1px solid #fed7aa; padding: 1rem; border-radius: var(--radius); margin-bottom: 0.5rem; position: relative; }
+
+/* Buttons */
+.btn { padding: 0.6rem 1rem; border-radius: var(--radius); border: none; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; transition: 0.2s; }
+.btn.primary { background: var(--primary); color: white; }
+.btn.primary:hover { background: #1d4ed8; }
+.btn.danger-ghost { color: var(--danger); background: transparent; }
+.btn.danger-ghost:hover { background: #fee2e2; }
+.btn.small { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+.w-100 { width: 100%; }
+
+/* Utilities */
+.text-green { color: var(--success); }
+.text-red { color: var(--danger); }
+.mt-2 { margin-top: 1rem; }
+.hidden { display: none; }
+    </style>
 </head>
 <body>
-  <header class="app-header">
-    <h1>Vaka Editörü</h1>
-    <p>JSON tabanlı vaka verilerini yönet</p>
-  </header>
 
-  <main class="editor-layout">
-    <!-- Sol: vaka listesi & genel ayarlar -->
-    <aside class="sidebar card" aria-label="Vaka Listesi">
-      <h2>Vaka Listesi</h2>
-      <ul id="caseList" class="case-list"></ul>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="material-icons-round">medical_services</span>
+            <h3>MedSim Editör</h3>
+        </div>
+        
+        <div class="sidebar-actions">
+            <button id="addCaseBtn" class="btn primary-soft w-100">
+                <span class="material-icons-round">add</span> Yeni Vaka
+            </button>
+            <button id="importJsonBtn" class="btn ghost w-100">
+                <span class="material-icons-round">upload_file</span> JSON Yükle
+            </button>
+            <input type="file" id="jsonFileInput" hidden accept=".json">
+        </div>
 
-      <button id="addCaseBtn" class="btn small">Yeni Vaka Ekle</button>
-      <button id="deleteCaseBtn" class="btn danger small">Seçili Vakayı Sil</button>
+        <div class="case-list-container">
+            <div class="search-box">
+                <span class="material-icons-round">search</span>
+                <input type="text" id="caseSearchInput" placeholder="Vaka ara...">
+            </div>
+            <ul id="caseList" class="case-list">
+                </ul>
+        </div>
 
-      <hr />
-
-      <h3>Genel Ayarlar</h3>
-      <label for="featuredCaseIdInput">Featured Case ID:</label>
-      <input id="featuredCaseIdInput" type="text" />
-
-      <button id="saveToLocalBtn" class="btn small">Yerel Olarak Kaydet</button>
-
-      <hr />
-
-      <h3>JSON İçe/Dışa Aktarım</h3>
-      <input id="jsonFileInput" type="file" accept="application/json" />
-      <button id="downloadJsonBtn" class="btn small">JSON İndir</button>
-
-      <h4>Toplu Vaka Ekle (JSON dizi)</h4>
-      <textarea id="bulkCasesInput" rows="6" placeholder='[{"id":"case-003",...}]'></textarea>
-      <button id="bulkAppendBtn" class="btn small">Dizi Ekleyip Forma Yükle</button>
-
-      <div id="validationResult" class="validation-box"></div>
+        <div class="sidebar-footer">
+            <button id="saveToLocalBtn" class="btn success small">
+                <span class="material-icons-round">save</span> Tarayıcıya Kaydet
+            </button>
+            <button id="downloadJsonBtn" class="btn outline small">
+                <span class="material-icons-round">download</span> İndir
+            </button>
+        </div>
     </aside>
 
-    <!-- Sağ: vaka formu -->
-    <section class="main-panel card" aria-label="Vaka Formu">
-      <h2 id="editorCaseTitle">Vaka Düzenleme</h2>
+    <main class="main-content">
+        <header class="top-bar">
+            <div class="case-meta">
+                <span class="badge" id="caseIdDisplay">CASE-000</span>
+                <input type="text" id="caseTitleInput" class="seamless-input" placeholder="Vaka Başlığı Giriniz...">
+            </div>
+            <div class="top-actions">
+                <div class="difficulty-selector">
+                    <label>Zorluk:</label>
+                    <select id="caseDifficultyInput">
+                        <option value="kolay" class="text-green">🟢 Kolay</option>
+                        <option value="orta" class="text-orange">🟠 Orta</option>
+                        <option value="zor" class="text-red">🔴 Zor</option>
+                    </select>
+                </div>
+                <button id="deleteCaseBtn" class="btn icon-only danger-ghost" title="Vakayı Sil">
+                    <span class="material-icons-round">delete</span>
+                </button>
+            </div>
+        </header>
 
-      <form id="caseForm">
-        <div class="form-row">
-          <label for="caseIdInput">ID</label>
-          <input id="caseIdInput" required />
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tab-patient">
+                <span class="material-icons-round">person</span> Hasta & Hikaye
+            </button>
+            <button class="tab-btn" data-tab="tab-exam">
+                <span class="material-icons-round">monitor_heart</span> Muayene & Vital
+            </button>
+            <button class="tab-btn" data-tab="tab-labs">
+                <span class="material-icons-round">science</span> Laboratuvar
+            </button>
+            <button class="tab-btn" data-tab="tab-imaging">
+                <span class="material-icons-round">image</span> Görüntüleme
+            </button>
+            <button class="tab-btn" data-tab="tab-treatment">
+                <span class="material-icons-round">medication</span> Tedavi & İlaç
+            </button>
+            <button class="tab-btn" data-tab="tab-final">
+                <span class="material-icons-round">verified</span> Sonuç & Puan
+            </button>
+        </nav>
+
+        <div class="content-scroll-area">
+            <form id="caseForm" autocomplete="off">
+                
+                <section id="tab-patient" class="tab-pane active">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3>Hasta Profili</h3>
+                            <div class="form-group">
+                                <label>Yaş</label>
+                                <input type="number" id="patientAgeInput" class="input-lg">
+                            </div>
+                            <div class="form-group">
+                                <label>Cinsiyet</label>
+                                <div class="radio-group">
+                                    <label class="radio-chip">
+                                        <input type="radio" name="sex" value="E" id="sexM"> <span>Erkek</span>
+                                    </label>
+                                    <label class="radio-chip">
+                                        <input type="radio" name="sex" value="K" id="sexF"> <span>Kadın</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Triaj (Öncelik)</label>
+                                <select id="patientTriageInput">
+                                    <option value="yeşil">Yeşil (Acil Değil)</option>
+                                    <option value="sarı">Sarı (Acil)</option>
+                                    <option value="kırmızı">Kırmızı (Kritik)</option>
+                                    <option value="siyah">Siyah (Eks)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Ortam & Etiketler</h3>
+                            <div class="form-group">
+                                <label>Ortam (Setting)</label>
+                                <select id="patientSettingInput">
+                                    <option value="ambulans">Ambulans</option>
+                                    <option value="acil">Acil Servis (ER)</option>
+                                    <option value="poliklinik">Poliklinik</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Etiketler (Virgülle ayır)</label>
+                                <input id="caseTagsInput" placeholder="Ör: kardiyoloji, travma">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-2">
+                        <h3>Klinik Senaryo</h3>
+                        <div class="form-group">
+                            <label>Paramedik Notu / Devir</label>
+                            <textarea id="paramedicInput" rows="2" placeholder="112 ekibi ne diyor?"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Hikaye (Anamnez)</label>
+                            <textarea id="storyInput" rows="4" placeholder="Hastanın şikayeti ve öyküsü..."></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-exam" class="tab-pane">
+                    <div class="card bg-gradient">
+                        <h3>Vital Bulgular (Otomatik Birleştirici)</h3>
+                        <div class="vital-grid">
+                            <div class="vital-item">
+                                <label>TA (mmHg)</label>
+                                <input id="vitalBP" placeholder="120/80">
+                            </div>
+                            <div class="vital-item">
+                                <label>Nabız (/dk)</label>
+                                <input id="vitalHR" type="number" placeholder="80">
+                            </div>
+                            <div class="vital-item">
+                                <label>Ateş (°C)</label>
+                                <input id="vitalTemp" type="number" step="0.1" placeholder="36.5">
+                            </div>
+                            <div class="vital-item">
+                                <label>SpO2 (%)</label>
+                                <input id="vitalSat" type="number" placeholder="98">
+                            </div>
+                            <div class="vital-item">
+                                <label>Solunum (/dk)</label>
+                                <input id="vitalRR" type="number" placeholder="16">
+                            </div>
+                            <div class="vital-item">
+                                <label>GKS</label>
+                                <input id="vitalGCS" placeholder="15 (E4M6V5)">
+                            </div>
+                        </div>
+                        <small class="hint">*Değerleri buraya girin, alttaki büyük kutuya otomatik yazılacaktır.</small>
+                    </div>
+
+                    <div class="card mt-2">
+                        <h3>Fizik Muayene & Detaylı Vitaller</h3>
+                        <div class="form-group">
+                            <label>Vital Bulgular (Tam Metin)</label>
+                            <textarea id="examVitalsInput" rows="2" class="code-font"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Sistemik Muayene</label>
+                            <textarea id="examPhysicalInput" rows="6" placeholder="Baş-Boyun: ..., Solunum: ..., Batın: ..."></textarea>
+                            <div class="quick-tags">
+                                <button type="button" class="chip" onclick="addToExam('Solunum sesleri doğal.')">+ Solunum Doğal</button>
+                                <button type="button" class="chip" onclick="addToExam('Batın rahat, defans yok.')">+ Batın Rahat</button>
+                                <button type="button" class="chip" onclick="addToExam('Ral/Ronküs yok.')">+ Akciğer Temiz</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-labs" class="tab-pane">
+                    <div class="alert-box">
+                        <span class="material-icons-round">info</span>
+                        Varsayılan Yanıt: <input id="labsDefaultInput" value="Laboratuvar sonucu bekleniyor." class="inline-edit">
+                    </div>
+                    
+                    <div class="split-view">
+                        <div class="list-container">
+                            <div class="list-header">
+                                <h4>Tanımlı Tetkikler</h4>
+                                <button type="button" id="addLabRowBtn" class="btn small primary">+ Özel Ekle</button>
+                            </div>
+                            <div id="labsContainer" class="styled-list"></div>
+                        </div>
+                        
+                        <div class="quick-pick-panel">
+                            <h4>Hızlı Ekle</h4>
+                            <div class="chip-grid" id="quickLabsArea">
+                                </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-imaging" class="tab-pane">
+                    <div class="card">
+                         <div class="card-header-action">
+                            <h3>Görüntüleme</h3>
+                            <input id="imagingDefaultInput" placeholder="Varsayılan yanıt..." class="input-sm">
+                        </div>
+                        <div class="split-view">
+                             <div class="list-container full-width">
+                                <div id="imagingContainer" class="styled-list"></div>
+                                <button type="button" id="addImagingRowBtn" class="btn dashed mt-1">+ Manuel Ekle</button>
+                             </div>
+                             <div class="quick-pick-row" id="quickImagingArea">
+                                 </div>
+                        </div>
+                    </div>
+
+                     <div class="card mt-2">
+                        <div class="card-header-action">
+                           <h3>Prosedür / Müdahale</h3>
+                           <input id="proceduresDefaultInput" placeholder="Varsayılan yanıt..." class="input-sm">
+                       </div>
+                       <div id="proceduresContainer" class="styled-list"></div>
+                       <div class="quick-pick-row mt-1" id="quickProceduresArea"></div>
+                   </div>
+                </section>
+
+                <section id="tab-treatment" class="tab-pane">
+                    <div class="card">
+                        <h3>İlaçlar</h3>
+                        <div id="drugsContainer" class="cards-grid"></div>
+                        <div class="action-bar mt-2">
+                            <button type="button" id="addDrugBtn" class="btn primary">
+                                <span class="material-icons-round">add_circle</span> İlaç Ekle
+                            </button>
+                            <div class="dropdown-wrapper">
+                                <button type="button" class="btn outline" id="toggleDrugPresets">Sık Kullanılanlar ▼</button>
+                                <div id="drugPresetsList" class="dropdown-content hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-2">
+                        <h3>Konsültasyonlar</h3>
+                        <label>Bölümler (Virgülle ayır)</label>
+                        <input id="consultsInput" placeholder="Nöroloji, Genel Cerrahi">
+                    </div>
+                </section>
+
+                 <section id="tab-final" class="tab-pane">
+                    <div class="grid-2">
+                        <div class="card">
+                            <h3>Tanı ve Sonuç</h3>
+                            <div class="form-group">
+                                <label>Final Tanı</label>
+                                <input id="finalDiagnosisInput" class="input-lg success-border">
+                            </div>
+                            <div class="form-group">
+                                <label>Taburculuk/Yatış (Disposition)</label>
+                                <input id="dispositionInput" placeholder="Taburcu, YBÜ Yatış, Sevk...">
+                            </div>
+                        </div>
+                        <div class="card">
+                            <h3>Puanlama Ayarları</h3>
+                            <div class="score-grid">
+                                <div><label>Başlangıç Puanı</label><input type="number" id="baseScoreInput"></div>
+                                <div><label>Doğru Tanı Bonusu</label><input type="number" id="bonusDxInput" class="text-green"></div>
+                                <div><label>Lab Cezası</label><input type="number" id="penaltyLabInput" class="text-red"></div>
+                                <div><label>Görüntüleme Cezası</label><input type="number" id="penaltyImagingInput" class="text-red"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-2">
+                        <h3>Medya Dosyaları</h3>
+                        <div class="form-group">
+                            <label>Kapak Görseli (URL/Path)</label>
+                            <input id="mediaCoverInput">
+                        </div>
+                        <div class="form-group">
+                            <label>EKG Görseli</label>
+                            <input id="mediaEkgInput">
+                        </div>
+                         <div class="form-group">
+                            <label>Galeri (Virgülle)</label>
+                            <input id="mediaGalleryInput">
+                        </div>
+                    </div>
+                </section>
+
+            </form>
         </div>
+    </main>
+</div>
 
-        <div class="form-row">
-          <label for="caseTitleInput">Başlık</label>
-          <input id="caseTitleInput" required />
-        </div>
-
-        <div class="form-row">
-          <label for="caseDifficultyInput">Zorluk</label>
-          <select id="caseDifficultyInput">
-            <option value="kolay">kolay</option>
-            <option value="orta">orta</option>
-            <option value="zor">zor</option>
-          </select>
-        </div>
-
-        <div class="form-row">
-          <label for="caseTagsInput">Etiketler (virgülle ayrılmış)</label>
-          <input id="caseTagsInput" placeholder="kardiyoloji, travma" />
-        </div>
-
-        <fieldset class="form-fieldset">
-          <legend>Hasta Bilgisi</legend>
-          <div class="form-row">
-            <label for="patientAgeInput">Yaş</label>
-            <input id="patientAgeInput" type="number" min="0" />
-          </div>
-          <div class="form-row">
-            <label for="patientSexInput">Cinsiyet</label>
-            <select id="patientSexInput">
-              <option value="">-</option>
-              <option value="E">E</option>
-              <option value="K">K</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <label for="patientSettingInput">Ortam</label>
-            <input id="patientSettingInput" placeholder="ambulans, acil vb." />
-          </div>
-          <div class="form-row">
-            <label for="patientTriageInput">Triaj</label>
-            <input id="patientTriageInput" placeholder="kırmızı, sarı, yeşil" />
-          </div>
-        </fieldset>
-
-        <div class="form-row">
-          <label for="storyInput">Hikaye</label>
-          <textarea id="storyInput" rows="3"></textarea>
-        </div>
-
-        <fieldset class="form-fieldset">
-          <legend>Muayene</legend>
-          <div class="form-row">
-            <label for="examVitalsInput">Vital Bulgular</label>
-            <textarea id="examVitalsInput" rows="2"></textarea>
-          </div>
-          <div class="form-row">
-            <label for="examPhysicalInput">Fizik Muayene</label>
-            <textarea id="examPhysicalInput" rows="3"></textarea>
-          </div>
-        </fieldset>
-
-        <!-- Labs -->
-        <fieldset class="form-fieldset">
-          <legend>Laboratuvar</legend>
-          <div class="form-row">
-            <label for="labsDefaultInput">Varsayılan Yanıt</label>
-            <input id="labsDefaultInput" placeholder="Bu tetkik için sonuç yok." />
-          </div>
-          <div id="labsContainer" class="kv-container"></div>
-          <button id="addLabRowBtn" type="button" class="btn small">Tetkik Satırı Ekle</button>
-        </fieldset>
-
-        <!-- Imaging -->
-        <fieldset class="form-fieldset">
-          <legend>Görüntüleme</legend>
-          <div class="form-row">
-            <label for="imagingDefaultInput">Varsayılan Yanıt</label>
-            <input id="imagingDefaultInput" placeholder="Bu görüntüleme için kayıt yok." />
-          </div>
-          <div id="imagingContainer" class="kv-container"></div>
-          <button id="addImagingRowBtn" type="button" class="btn small">Görüntüleme Satırı Ekle</button>
-        </fieldset>
-
-        <!-- Procedures -->
-        <fieldset class="form-fieldset">
-          <legend>Prosedür / Müdahale</legend>
-          <div class="form-row">
-            <label for="proceduresDefaultInput">Varsayılan Yanıt</label>
-            <input id="proceduresDefaultInput" placeholder="Prosedür sonucu kaydı yok." />
-          </div>
-          <div id="proceduresContainer" class="kv-container"></div>
-          <button id="addProcedureRowBtn" type="button" class="btn small">Prosedür Satırı Ekle</button>
-        </fieldset>
-
-        <!-- Media -->
-        <fieldset class="form-fieldset">
-          <legend>Medya Referansları</legend>
-          <div class="form-row">
-            <label for="mediaCoverInput">Kapak Görseli</label>
-            <input id="mediaCoverInput" placeholder="media/defaults/case-hero.jpg" />
-          </div>
-          <div class="form-row">
-            <label for="mediaEkgInput">EKG Görseli</label>
-            <input id="mediaEkgInput" placeholder="media/defaults/ekg-placeholder.png" />
-          </div>
-          <div class="form-row">
-            <label for="mediaGalleryInput">Görüntüleme Galerisi (virgülle ayrılmış)</label>
-            <input id="mediaGalleryInput" placeholder="media/defaults/xray-placeholder.png" />
-          </div>
-          <div class="form-row">
-            <label for="mediaAudioInput">Ses Notu</label>
-            <input id="mediaAudioInput" placeholder="media/defaults/ems-radio.mp3" />
-          </div>
-        </fieldset>
-
-        <!-- Drugs -->
-        <fieldset class="form-fieldset">
-          <legend>İlaçlar</legend>
-          <div id="drugsContainer" class="drugs-container"></div>
-          <button id="addDrugBtn" type="button" class="btn small">İlaç Ekle</button>
-        </fieldset>
-
-        <!-- Consults -->
-        <fieldset class="form-fieldset">
-          <legend>Konsültasyon</legend>
-          <div class="form-row">
-            <label for="consultsInput">Bölümler (virgülle ayrılmış)</label>
-            <input id="consultsInput" placeholder="Kardiyoloji, Göğüs cerrahisi" />
-          </div>
-        </fieldset>
-
-        <!-- Disposition (metin olarak) -->
-        <fieldset class="form-fieldset">
-          <legend>Stabilizasyon / Nakil / Taburcu</legend>
-          <div class="form-row">
-            <label for="dispositionTextInput">Açıklama</label>
-            <textarea id="dispositionTextInput" rows="2" placeholder="Varsayılan açıklama (opsiyonel)"></textarea>
-          </div>
-        </fieldset>
-
-        <!-- Final Diagnosis & Scoring -->
-        <fieldset class="form-fieldset">
-          <legend>Final Tanı ve Skorlama</legend>
-          <div class="form-row">
-            <label for="finalDiagnosisInput">Final Tanı</label>
-            <input id="finalDiagnosisInput" required />
-          </div>
-          <div class="form-row">
-            <label for="scoreBaseInput">Başlangıç Skoru</label>
-            <input id="scoreBaseInput" type="number" value="100" />
-          </div>
-          <div class="form-row">
-            <label for="penaltyLabInput">Tetkik Başına Ceza</label>
-            <input id="penaltyLabInput" type="number" value="5" />
-          </div>
-          <div class="form-row">
-            <label for="penaltyImagingInput">Görüntüleme Başına Ceza</label>
-            <input id="penaltyImagingInput" type="number" value="8" />
-          </div>
-          <div class="form-row">
-            <label for="penaltyProcedureInput">Prosedür Başına Ceza</label>
-            <input id="penaltyProcedureInput" type="number" value="10" />
-          </div>
-          <div class="form-row">
-            <label for="bonusDxInput">Doğru Tanı Bonusu</label>
-            <input id="bonusDxInput" type="number" value="50" />
-          </div>
-        </fieldset>
-
-        <div class="form-actions">
-          <button id="applyCaseChangesBtn" type="button" class="btn primary">Değişiklikleri Uygula</button>
-        </div>
-      </form>
-
-      <h3>Ham JSON Önizleme</h3>
-      <textarea id="rawJsonPreview" rows="10" class="raw-json"></textarea>
-      <div class="form-actions">
-        <button id="jsonToFormBtn" type="button" class="btn small">JSON'dan Forma Yükle</button>
-      </div>
-    </section>
-  </main>
-
-  <footer class="app-footer">
-    <small>Vaka editörü – son düzenlenen veriler tarayıcıda saklanır.</small>
-  </footer>
-
-  <script type="module" src="js/vaka-edit.js"></script>
+<script type="module" src="js/vaka-edit.js"></script>
 </body>
 </html>
