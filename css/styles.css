@@ -73,9 +73,9 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: nowrap;
-  gap: 0.4rem;
-  padding: 0.5rem 0.65rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--border);
   background: rgba(2,6,23,0.92);
   backdrop-filter: blur(8px);
@@ -84,8 +84,8 @@ a:hover {
 
 .mobile-actionbar .actionbar-left,
 .mobile-actionbar .actionbar-right {
-  flex-wrap: nowrap;
-  gap: 0.3rem;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.4rem;
 }
 
 .mobile-actionbar .btn {
@@ -225,9 +225,11 @@ a:hover {
 
 .action-rail {
   position: fixed;
-  top: 96px;
+  top: 88px;
+  bottom: 12px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 0.2rem;
   min-width: 52px;
   z-index: 15;
@@ -238,10 +240,13 @@ a:hover {
   background: rgba(15,23,42,0.8);
   color: var(--heading);
   border-radius: 12px;
-  padding: 0.32rem 0.3rem;
+  padding: 0.42rem 0.45rem;
   font-size: 0.76rem;
+  min-height: 68px;
   text-align: center;
   cursor: pointer;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
 }
 
@@ -431,11 +436,12 @@ a:hover {
   }
   .action-rail {
     position: fixed;
-    top: 118px;
+    top: 100px;
+    bottom: 12px;
     transform: none;
     flex-direction: column;
-    justify-content: flex-start;
-    gap: 0.28rem;
+    justify-content: space-between;
+    gap: 0.24rem;
     z-index: 30;
     background: transparent;
     padding: 0;
@@ -443,10 +449,10 @@ a:hover {
     box-shadow: none;
   }
   .action-rail .rail-btn {
-    writing-mode: horizontal-tb;
-    text-orientation: initial;
-    padding: 0.35rem 0.32rem;
-    min-height: auto;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    padding: 0.45rem 0.42rem;
+    min-height: 68px;
   }
   .rail-left {
     left: 8px;
